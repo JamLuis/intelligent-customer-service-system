@@ -99,3 +99,61 @@ review_task: pending/approved/rejected/merged
 3. graph node/edge 前端数据结构。
 4. 诊断检索返回的 `graphPaths` 与 `evidenceItems` 如何对应。
 5. 发布/回滚接口的并发控制方式。
+
+## 8. V0.3.1 增量任务：KG-API-004
+
+**输出**：`04_数据库与API/09_API文档.md`、`04_数据库与API/09J_KG_ADMIN接口.md`、`04_数据库与API/09C_错误码登记表.md`。参考 07F §12.1 / §13.2A / §13.4。
+
+### 8.1 新增接口
+
+| 编号 | 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| KG-022 | POST | `/api/v1/graphs/entities/{entityId}/actions` | body `{action: "freeze\|unfreeze", reason?: string}`；freeze 需 `graph:freeze`，unfreeze 需 `graph:unfreeze`；响应 `{entityId, status, lastModifiedAt}` |
+| KG-023 | POST | `/api/v1/graphs/relations/{relationId}/actions` | 同上，作用于关系 |
+
+### 8.2 KG-010 诊断检索 请求 / 响应 增量
+
+```jsonc
+// 请求体可选 traversalBudget
+{
+  "questionText": "...",
+  "traversalBudget": {
+    "maxNodes": 300,
+    "maxEdges": 800,
+    "maxDepthHardCap": 5,
+    "maxFanOutPerNode": 80,
+    "timeoutMs": 1500
+  }
+}
+```
+
+```jsonc
+// 响应体增量字段
+{
+  "graphPaths": [...],
+  "sourceEvidence": [{"blockId": "...", "weight": 0.85, "sourceType": "paragraph"}],
+  "vectorEvidence": [{"blockId": "...", "weight": 0.72, "sourceType": "table_cell"}],
+  "hybridScore": {"vector": 0.45, "bm25": 0.30, "graph": 0.20, "recency": 0.05},
+  "budgetUsage": {"visitedNodes": 280, "visitedEdges": 700, "truncated": false},
+  "embeddingModel": "bge-large-zh-v1.5",
+  "embeddingVersion": "2024Q4"
+}
+```
+
+### 8.3 KG-005 (block 上传) 增量要求
+
+- 请求 body 增 `embeddingModel` `embeddingVersion`（必填）、`parentBlockId`（可选）。
+- 响应回按原样 echo。
+
+### 8.4 错码补充（同步到 09C）
+
+| 错码 | HTTP | 含义 |
+| --- | --- | --- |
+| ICSS-KG-409-FROZEN_NODE | 409 | 目标实体/关系处于 frozen，拒绝自动合并/规范化 |
+| ICSS-KG-422-EMBEDDING_VERSION_MISMATCH | 422 | 查询与库中 embedding_model/version 不一致 |
+| ICSS-KG-413-BUDGET_EXCEEDED | 413 | Traversal Budget 超限（与响应 `truncated=true` 区别：budget=0 或 timeout 走本错码） |
+| ICSS-KG-403-FREEZE_FORBIDDEN | 403 | 调用者缺 `graph:freeze`/`graph:unfreeze` 权限 |
+
+### 8.5 Evidence 返回体统一
+
+所有 evidence 返回体（KG-014 证据抽屉、KG-015 可视化、KG-010 诊断检索）统一为 `{blockId: string, weight: number, sourceType: "title\|paragraph\|table_cell\|table_caption\|list_item\|code\|json_field\|csv_cell\|ocr\|kv_pair"}`，weight 范围 [0,1]。

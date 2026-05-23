@@ -140,3 +140,20 @@ npm run build --workspace smart-support-mcp-server-node
 3. P1 缺陷有明确规避或延期说明。
 4. 所有测试命令结果记录在交接单。
 5. 状态总表和变更记录已更新。
+
+## 8. V0.3.1 增量任务：KG-QA-005 加固项验收
+
+参考 07F §8 / §10A.4 / §12.1 / §13 / §19。需额外决走以下 5 个 Acceptance Case：
+
+| AC | 场景 | 输入 | 预期 |
+| --- | --- | --- | --- |
+| AC-KG-011 | Neo4j 仅限商用 Label | 调用全链路写入 5 个不同 entityType 、然后 `CALL db.labels()` | 返回集合 ⊆ {KnowledgeEntity, SourceBlock, Document, Section}；出现其他 Label 计为失败 |
+| AC-KG-012 | Embedding 版本不匹配 | 以 `bge-zh:2024Q3` 查库中只有 `bge-zh:2024Q4` | 返 `ICSS-KG-422-EMBEDDING_VERSION_MISMATCH` |
+| AC-KG-013 | Traversal Budget 截断 | `maxNodes=10` 诊断查询一个热点（>10 节点） | 响应 `budgetUsage.truncated=true`，graphPaths.length 受限 |
+| AC-KG-014 | Frozen 拒绝 auto-normalize | 实体 A 被 freeze；那一同名实体被后续 extract 生出 | 产 conflict review task `reason_code='frozen_blocked'`，原节点保持不变 |
+| AC-KG-015 | embedding-only 不自动合并 | 两个同名不同唯一键实体，仅 embedding 余弦 0.92 | 仅生 `cross_link_hint`，不产 merge suggestion |
+
+### DoD
+
+- 5 项 AC 全部路过；报告落到 `06_测试与发布/测试报告/KG-QA-005-V031-加固验收.md`。
+- Redis 缓存命中率指标 `kg_cache_hit_total{type=path|neighbor|evidence}` 能在 `/actuator/metrics` 中打印 (与后续 KG-FB-007 联动；如后端未实现，在交接单里明确标为“待实现”)。

@@ -152,3 +152,25 @@ python3 -m pytest ai-service-python/tests
 3. candidate schema 字段说明。
 4. 哪些 sourceType 已支持，哪些返回 unsupported。
 5. LLM/embedding provider 是否可配置，默认如何降级。
+
+## 9. V0.3.1 增量任务
+
+### KG-AI-006 Evidence 加权 与 检索关键词抽取
+
+**输出**：`ai-service-python/app/extractors/llm_extractor.py`、`ai-service-python/app/retrieval/graph_retrieval_planner.py`。参考 07F §11.2 / §13.4.5。
+
+- `/knowledge/extract` 响应 candidates[*].evidence 从纯数组改为对象数组 `[{blockId, weight, sourceType}]`。
+- 默认权重表：`table_cell=1.0`、`paragraph=0.85`、`table_caption=0.7`、`ocr=0.4`、`code_comment=0.5`、`title=0.9`、`list_item=0.75`、`json_field=0.95`、`csv_cell=0.95`、`kv_pair=0.9`。
+- LLM 输出不定 sourceType 统一为 `paragraph`；weight 越界则奋 clamp 到 [0,1]。
+- `/graphs/retrieve-plan` 响应额外输出 `keywords: string[]` 与 `vectorQueryText: string`，以供 Java 侧 Hybrid Retrieval。无法抽取关键词时 → `keywords=simple_tokenize(questionText)`，不允许返空。
+- 响应增 `embeddingModel` `embeddingVersion` echo，仅告知上游当前使用哪个型号。
+- DoD：单元测试覆盖 10 种 sourceType 的默认权重、weight clamp、keywords fallback。
+
+### KG-AI-007 Canonical Resolver 服务端辅助
+
+**输出**：`ai-service-python/app/extractors/entity_normalizer.py` (新增 `canonical_resolver.py`)。参考 07F §10A.4。
+
+- `/knowledge/normalize` 响应每个 normalized 项增 `scoreBreakdown{uniqueKey, alias, regex, embedding, codeGraphRef, llmVerify}`。
+- embedding-only 高似不生合并建议，仅输出 `crossLinkHint=true` 交给 Java 侧表决。
+- 入参接收上游 `frozen` 倒准入名单，这些项跳过规范化 → 输出 `skipped=true, reason="frozen"`。
+- DoD：单元测试覆盖：(1) UniqueKey 命中 → 生合并建议；(2) 只有 embedding 高似 → 仅 hint；(3) frozen 项 → skipped。

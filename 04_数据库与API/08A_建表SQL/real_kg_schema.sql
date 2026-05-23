@@ -118,6 +118,33 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_hnsw ON knowledge_block
 COMMENT ON TABLE knowledge_block IS '知识解析块表：保存文本块、表格块、OCR 块、日志块及向量索引';
 COMMENT ON COLUMN knowledge_block.embedding IS 'pgvector 语义召回向量，当前维度 1536；只作为证据召回，不作为最终关系判断';
 
+-- ============================================================================
+-- V0.3.1 知识块加固：父链 + embedding 版本三件套 + 全文检索 tsvector
+-- 对应 07F §9.4 / §13.4.2，支持 Hybrid Retrieval 与 embedding 版本严格过滤
+-- ============================================================================
+ALTER TABLE knowledge_block
+  ADD COLUMN IF NOT EXISTS parent_block_id uuid REFERENCES knowledge_block(block_id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS embedding_model varchar(64),
+  ADD COLUMN IF NOT EXISTS embedding_version varchar(32),
+  ADD COLUMN IF NOT EXISTS embedding_dim int;
+
+ALTER TABLE knowledge_block
+  ADD COLUMN IF NOT EXISTS ts tsvector
+    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(normalized_text, raw_text))) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_ts_gin
+  ON knowledge_block USING gin (ts);
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_parent
+  ON knowledge_block (parent_block_id) WHERE parent_block_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_model_ver
+  ON knowledge_block (embedding_model, embedding_version) WHERE embedding IS NOT NULL;
+
+COMMENT ON COLUMN knowledge_block.parent_block_id IS 'V0.3.1：父块引用，用于表格→单元格、章节→段落等层级关系';
+COMMENT ON COLUMN knowledge_block.embedding_model IS 'V0.3.1：embedding 模型名（如 bge-large-zh-v1.5），Hybrid Retrieval 严格按此过滤';
+COMMENT ON COLUMN knowledge_block.embedding_version IS 'V0.3.1：embedding 版本（如 2024Q4），与 model 联合唯一标识向量空间';
+COMMENT ON COLUMN knowledge_block.embedding_dim IS 'V0.3.1：embedding 维度（如 1536），用于自适应索引校验';
+COMMENT ON COLUMN knowledge_block.ts IS 'V0.3.1：生成列 tsvector(simple)，用于 BM25 全文召回（plainto_tsquery）';
+
 CREATE TABLE IF NOT EXISTS graph_candidate_entity (
   candidate_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_id uuid NOT NULL,
@@ -181,6 +208,26 @@ CREATE INDEX IF NOT EXISTS idx_candidate_relation_type ON graph_candidate_relati
 CREATE INDEX IF NOT EXISTS idx_candidate_relation_candidates ON graph_candidate_relation (source_candidate_id, target_candidate_id);
 
 COMMENT ON TABLE graph_candidate_relation IS '候选关系表：保存从内容中抽取出的待校验实体关系';
+
+-- ============================================================================
+-- V0.3.1 候选 frozen 状态 + 加权 evidence_refs
+-- 对应 07F §9.5/§9.6/§11.2/§12.1
+-- ============================================================================
+ALTER TABLE graph_candidate_entity DROP CONSTRAINT IF EXISTS ck_candidate_entity_status;
+ALTER TABLE graph_candidate_entity ADD CONSTRAINT ck_candidate_entity_status
+  CHECK (status IN ('candidate','accepted','reviewing','rejected','conflict','merged','frozen'));
+
+ALTER TABLE graph_candidate_relation DROP CONSTRAINT IF EXISTS ck_candidate_relation_status;
+ALTER TABLE graph_candidate_relation ADD CONSTRAINT ck_candidate_relation_status
+  CHECK (status IN ('candidate','accepted','reviewing','rejected','conflict','merged','frozen'));
+
+ALTER TABLE graph_candidate_relation
+  ADD COLUMN IF NOT EXISTS evidence_refs jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE graph_candidate_relation DROP CONSTRAINT IF EXISTS ck_candidate_relation_evidence_refs;
+ALTER TABLE graph_candidate_relation ADD CONSTRAINT ck_candidate_relation_evidence_refs
+  CHECK (jsonb_typeof(evidence_refs) = 'array');
+
+COMMENT ON COLUMN graph_candidate_relation.evidence_refs IS 'V0.3.1：加权证据数组 [{blockId,weight,sourceType}]，与 evidence_block_ids 并存；新链路写 evidence_refs，旧链路兼容读 evidence_block_ids';
 
 CREATE TABLE IF NOT EXISTS graph_review_task (
   review_task_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

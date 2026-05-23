@@ -75,3 +75,15 @@
 4. 是否改变 API / DB / 状态枚举。
 5. 运行了哪些验证命令。
 6. 需要下一个 Agent 注意什么。
+
+## 8. V0.3.1 加固提示（随 07F V0.3.1 上线同步升级）
+
+所有 Agent 动工前必须额外确认下面 5 条不可越红线，详细条款及代码示例见《07F §8 / §10A.4 / §12.1 / §13》：
+
+1. **Neo4j 仅限两种商用 Label**：`:KnowledgeEntity` + `:RELATION`，`entityType` / `relationType` 走属性；平台保护实体仅 `:SourceBlock/:Document/:Section`。
+2. **归一 / 合并必面 6 信号加权**（0.40 UniqueKey + 0.20 Alias + 0.15 Regex + 0.10 Embedding + 0.10 CodeGraphRef + 0.05 LLMVerify）且阈值 ≥0.85 、含任一强信号（w1/w2/w3）才可用，embedding-only 仅产 `cross_link_hint`。
+3. **诊断 / 邻居 / 路径 Cypher 必须携 Traversal Budget**（maxNodes/maxEdges/maxFanOutPerNode/maxDepthHardCap/timeoutMs）且超限返 `truncated=true`。
+4. **检索走 Hybrid Retrieval**（0.45 Vector + 0.35 BM25 + 0.20 GraphBoost 可选 +0.05 Recency），向量路必须过滤 `embedding_model,embedding_version`。
+5. **实体/关系 status 枚举加 `frozen`**，published ↔ frozen 仅能通过 `graph:freeze`/`graph:unfreeze` API，frozen 节点拒被 auto-merge/auto-normalize。
+
+不同角色的 V0.3.1 增量任务见 `02_任务总表.md` §2A（KG-DB-004/005、KG-API-004、KG-BE-011~015、KG-AI-006/007、KG-FE-005、KG-QA-005）。

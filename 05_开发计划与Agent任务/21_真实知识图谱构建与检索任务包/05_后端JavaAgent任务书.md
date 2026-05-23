@@ -175,3 +175,66 @@ curl http://127.0.0.1:8088/api/v1/graphs/taxonomy
 3. Neo4j 是否需要先手工初始化 constraints。
 4. task action 的幂等键规则。
 5. 诊断检索目前支持哪些 graphCategoryId。
+
+## 8. V0.3.1 增量任务
+
+### KG-BE-011 KnowledgeEntity 与 RELATION 写入适配
+
+**输出**：`backend-java/.../graph/Neo4jGraphRepository.java`。参考 07F §8.4。
+
+- 全部节点写入 Cypher 隐式使用 `MERGE (e:KnowledgeEntity {tenantId:$tenantId, projectId:$projectId, entityType:$entityType, entityId:$entityId})`，**不可** `MERGE (e:``+entityType+`` ...)`。
+- 全部关系写入 Cypher 使用 `MERGE (a)-[r:RELATION {relationId:$relationId}]->(b) SET r.relationType=$relationType, r.status=$status, ...`。
+- 节点上增 `status ∈ {draft,reviewing,published,frozen,deprecated,rolled_back}`，迁移老数据脚本一次性补默认值 `published`。
+- DoD：静态检查项中增加 `forbidden cypher pattern: :[A-Z][A-Za-z0-9_]+\s*\{` 位于动态拼接（除三个保护 Label），调用点 0 命中。
+
+### KG-BE-012 Traversal Budget 实现
+
+**输出**：`backend-java/.../graph/GraphSearchService.java` + `graph/dto/TraversalBudget.java`。参考 07F §13.2A / §13.3。
+
+- 默认值：maxNodes=300、maxEdges=800、maxDepthHardCap=5、maxFanOutPerNode=80、timeoutMs=1500。调用方传入取 `min(传入,默认上限)`。
+- BFS 会累计 `visitedNodes/visitedEdges`，超 max→ `truncated=true` 提前退出不报错。
+- 超 `timeoutMs` 走 `CompletableFuture.orTimeout` + `ICSS-KG-413-BUDGET_EXCEEDED`。
+- Cypher 必须同时携五个参数（甚至 maxFanOutPerNode 为 名字参数参与 `apoc.path.expandConfig` 或手写分页）。
+- 状态过滤固定 `status IN ['published','frozen']`。
+
+### KG-BE-013 Canonical Resolver 多信号归一
+
+**输出**：`backend-java/.../graph/CanonicalResolver.java` + `graph/dto/ScoreBreakdown.java`。参考 07F §10A.4。
+
+- 6 信号加权：w1=0.40 UniqueKeyMatch、w2=0.20 AliasMatch、w3=0.15 RegexRule、w4=0.10 Embedding、w5=0.10 CodeGraphRef、w6=0.05 LLMVerify。
+- 合并阈值：`score >= 0.85 && (w1命中 || w2命中 || w3命中)`；embedding-only 高似**仅**产 `cross_link_hint=true`，不生合并建议。
+- `scoreBreakdown` 写到 `graph_review_task.decision_payload.scoreBreakdown`。
+
+### KG-BE-014 Hybrid Retrieval
+
+**输出**：`backend-java/.../graph/HybridRetrievalService.java` + `KnowledgeBlockRepository.java`。参考 07F §13.4。
+
+- 三路并发（`CompletableFuture.allOf`）：VectorRecall（pgvector hnsw）、Bm25Recall (`ts @@ plainto_tsquery`)、GraphBoost (在 traversal 结果里计)。
+- HybridScore = 0.45*Vector + 0.35*BM25 + 0.20*GraphBoost (+0.05*Recency 仅在 `recencyAware=true` 时打开)。
+- 向量路 SQL 必须 `WHERE embedding_model = :embedding_model AND embedding_version = :embedding_version`；不一致 → 抛 `EmbeddingVersionMismatchException` → `ICSS-KG-422`。
+- planner 返回 `keywords` 为空时 fallback `simple_tokenize(questionText)`，**不允许**跳过 BM25。
+- 权重从 `application.yml → graph.search.hybrid.weights.{vector,bm25,graph,recency}` 读取。
+
+### KG-BE-015 Freeze / Unfreeze API
+
+**输出**：`backend-java/.../graph/GraphController.java` + `GraphAssetService.java` + `graph/FreezeService.java`。参考 07F §12.1。
+
+- Endpoint：`POST /api/v1/graphs/entities/{entityId}/actions`、`POST /api/v1/graphs/relations/{relationId}/actions`，action 允许 `freeze|unfreeze`。
+- 状态机守卫：freeze 仅允许 `published → frozen`；unfreeze 仅允许 `frozen → published`；其他转移报 `ICSS-KG-409-FROZEN_NODE` 或 409 状态泒错。
+- 需 `graph:freeze` / `graph:unfreeze` 权限，缺权 → `ICSS-KG-403-FREEZE_FORBIDDEN`。
+- frozen 被后续 extract/normalize到达 → 产 conflict review task、`reason_code='frozen_blocked'`，不覆写。
+- audit表记录事件，调用者/时间/reason 全部落盘。
+
+### 包结构补充
+
+```
+graph/
+  cache/                      # 预留给 KG-FB-007 / KG-BE-015 后续 Redis 缓存层
+  CanonicalResolver.java
+  HybridRetrievalService.java
+  FreezeService.java
+  TraversalBudgetExecutor.java
+  dto/
+    TraversalBudget.java
+    ScoreBreakdown.java
+```

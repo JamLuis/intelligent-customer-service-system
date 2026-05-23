@@ -98,3 +98,59 @@
 4. 哪些字段暂时 nullable。
 5. 已运行的 SQL 验证结果。
 6. 提醒下游：业务分类/实体/关系**全部需要租户通过 KG-016/019/020 在运行时注册**，禁止前端、后端、AI 服务任何地方硬编码业务本体名称。
+
+## 8. V0.3.1 增量任务
+
+### KG-DB-004 knowledge_block V0.3.1 字段与 tsvector
+
+**输出**：`04_数据库与API/08A_建表SQL/real_kg_schema.sql` 追加。参考 07F §9.4 / §13.4.2。
+
+```sql
+ALTER TABLE knowledge_block
+  ADD COLUMN IF NOT EXISTS parent_block_id uuid REFERENCES knowledge_block(block_id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS embedding_model varchar(64),
+  ADD COLUMN IF NOT EXISTS embedding_version varchar(32),
+  ADD COLUMN IF NOT EXISTS embedding_dim int;
+
+ALTER TABLE knowledge_block
+  ADD COLUMN IF NOT EXISTS ts tsvector
+    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(normalized_text, raw_text))) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_ts_gin ON knowledge_block USING gin (ts);
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_parent ON knowledge_block (parent_block_id) WHERE parent_block_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_model_ver ON knowledge_block (embedding_model, embedding_version) WHERE embedding IS NOT NULL;
+```
+
+**candidate status 加 frozen**：
+
+```sql
+ALTER TABLE graph_candidate_entity DROP CONSTRAINT IF EXISTS ck_candidate_entity_status;
+ALTER TABLE graph_candidate_entity ADD CONSTRAINT ck_candidate_entity_status
+  CHECK (status IN ('candidate','accepted','reviewing','rejected','conflict','merged','frozen'));
+ALTER TABLE graph_candidate_relation DROP CONSTRAINT IF EXISTS ck_candidate_relation_status;
+ALTER TABLE graph_candidate_relation ADD CONSTRAINT ck_candidate_relation_status
+  CHECK (status IN ('candidate','accepted','reviewing','rejected','conflict','merged','frozen'));
+ALTER TABLE graph_candidate_relation
+  ADD COLUMN IF NOT EXISTS evidence_refs jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE graph_candidate_relation DROP CONSTRAINT IF EXISTS ck_candidate_relation_evidence_refs;
+ALTER TABLE graph_candidate_relation ADD CONSTRAINT ck_candidate_relation_evidence_refs
+  CHECK (jsonb_typeof(evidence_refs) = 'array');
+```
+
+**DoD**：上述 SQL 在 `infra/postgres/init.sql` 中以 idempotent 方式重跑；GIN 索引可被 `EXPLAIN ANALYZE SELECT … WHERE ts @@ plainto_tsquery('simple','xxx')` 命中。
+
+### KG-DB-005 Neo4j 固定 Label 初始化脚本
+
+**输出**：`infra/neo4j/init.cypher`，参考 07F §8。脚本中只能出现 `:KnowledgeEntity` 与 `:RELATION` 两种 Label（紧邻平台保护实体 `:SourceBlock/:Document/:Section`），绝不能出现业务 Label。
+
+**必需创建**：
+
+- `CONSTRAINT KnowledgeEntity_uniq` ON `(e:KnowledgeEntity)` REQUIRE `(e.tenantId, e.projectId, e.entityType, e.entityId)` IS UNIQUE
+- `INDEX KnowledgeEntity_type` ON `(:KnowledgeEntity)` `(tenantId, projectId, entityType, status)`
+- `INDEX KnowledgeEntity_name` ON `(:KnowledgeEntity)` `(tenantId, projectId, entityName)`
+- `INDEX KnowledgeEntity_category` ON `(:KnowledgeEntity)` `(tenantId, projectId, category)`
+- `INDEX RELATION_type_status` ON `()-[:RELATION]-()` `(tenantId, projectId, relationType, status)`
+- `INDEX RELATION_revision_status` ON `()-[:RELATION]-()` `(tenantId, projectId, revisionId, status)`
+- `CONSTRAINT SourceBlock_uniq` ON `(b:SourceBlock)` REQUIRE `(b.tenantId, b.projectId, b.blockId)` IS UNIQUE
+
+**DoD**：`cypher-shell -f init.cypher` 可重跑不报错；`SHOW CONSTRAINTS` 能看到上述 7 项。

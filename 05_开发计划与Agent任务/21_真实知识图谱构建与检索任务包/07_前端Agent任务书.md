@@ -115,3 +115,31 @@ npm run build --workspace frontend
 2. 哪些按钮由于后端未完成暂时禁用。
 3. 每个页面的主要空状态、加载态、失败态。
 4. 如何构造一条从录入到预览的前端测试路径。
+
+## 8. V0.3.1 增量任务：KG-FE-005 Frozen / Budget / Hybrid 适配
+
+**输出**：`GraphEditor.vue`、`EvidenceDrawer.vue`、`AdminGraphMaintenanceView.vue`、新增 `BudgetBanner.vue`。参考 07F §12.1 / §13.2A / §13.4。
+
+### 8.1 Frozen 状态可视化
+
+- 节点/关系在 `status==='frozen'` 时叠加锁形徽标（el-icon-lock），节点边框改为仑青色 (#909399) 虚线。
+- 右键菜单/Action 条增 "Unfreeze"项，仅在用户拥有 `graph:unfreeze` 权限时可点击；发起 `POST /api/v1/graphs/entities/{id}/actions {action:'unfreeze'}`。
+- 发布 / 回滚 / 自动归一 / 手工合并 底层跳过 frozen 项；前端遇 `ICSS-KG-409-FROZEN_NODE` toast 提示“冻结节点拒绝该操作”。
+
+### 8.2 Budget 使用提示
+
+- `BudgetBanner.vue` 接收 `budgetUsage{visitedNodes,visitedEdges,truncated}` props；`truncated===true` 时顶部显示黄色横幅：“本次检索遇到预算天花板（访问 {visitedNodes} 节点 / {visitedEdges} 边），结果可能不完整。调高预算 粗选 / 精选 / 调试”。
+- 诊断检索页与路径查询页顶部插入。
+
+### 8.3 Hybrid 证据标识
+
+- `EvidenceDrawer.vue` 中 `sourceEvidence` 与 `vectorEvidence` 列表每项右侧增 荅 `el-tag` 显示 `sourceType`（paragraph / table_cell ...）与 `weight` 百分化文本。
+- `hybridScore{vector,bm25,graph,recency}` 以进度条型小卡片呈现于抽屉顶部，点击可查看权重来源。
+
+### 8.4 Embedding 版本不匹配
+
+- 接收后端 `ICSS-KG-422-EMBEDDING_VERSION_MISMATCH` 时弹 `el-notification.error` “查询使用的 embedding 模型与库不一致，请重新导入或联系管理员”；同时在高级选项展示节点上报的 `embeddingModel/embeddingVersion`。
+
+### DoD
+
+- 5 个 UI 状态被 Playwright/手动验证：frozen 锁形、truncated 横幅、weight 标识、hybridScore 抽屉、embedding 版本不匹配 toast。

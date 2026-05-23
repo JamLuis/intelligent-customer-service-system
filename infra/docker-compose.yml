@@ -36,6 +36,7 @@ services:
     volumes:
       - neo4j-data:/data
       - neo4j-logs:/logs
+      - ./neo4j/init.cypher:/imports/init.cypher:ro
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -u \"$${ICSS_NEO4J_USER}\" -p \"$${ICSS_NEO4J_PASSWORD}\" 'RETURN 1' >/dev/null 2>&1 || exit 1"]
       interval: 10s
