@@ -1,1 +1,0 @@
-"""pgvector semantic recall and chunk metadata access."""

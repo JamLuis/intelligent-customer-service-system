@@ -12,8 +12,9 @@ const props = defineProps<{
 
 const activeInput = ref<'structured' | 'file'>('structured');
 const structuredFormat = ref('rule_text');
-const selectedGraphCategoryId = ref('device-alarm');
-const sourceText = ref('设备告警规则：TC-003 绑定 AR-17，超载阈值 90%，启用状态 true。');
+// 不再硬编码 categoryId 与示例文本；首次渲染时由 UI 拉取本租户 taxonomy 后由用户选择。
+const selectedGraphCategoryId = ref('');
+const sourceText = ref('');
 const selectedFile = ref<File | null>(null);
 const taxonomy = ref<Record<string, any> | null>(null);
 const source = ref<Record<string, any> | null>(null);

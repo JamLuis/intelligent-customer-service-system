@@ -1,1 +1,0 @@
-"""Entity and relation extraction contracts."""

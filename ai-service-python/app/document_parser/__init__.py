@@ -1,1 +1,0 @@
-"""Document structure recovery and chunk preparation."""

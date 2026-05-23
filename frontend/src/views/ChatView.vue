@@ -16,7 +16,7 @@ interface Message {
 interface GuidedContext {
   issue: string;
   region: string;
-  vessel: string;
+  targetObject: string;
   occurredDate: string;
   extra: string;
 }
@@ -26,8 +26,8 @@ const props = defineProps<{
 }>();
 
 const mode = ref<ChatMode>('guided');
-const expertPrompt = ref('3号塔吊昨天超载了但没有报警，设备 TC-003，时间范围昨天 08:00-18:00，请结合规则、日志和设备状态诊断。');
-const guided = ref<GuidedContext>({ issue: '告警不准', region: '', vessel: '', occurredDate: '', extra: '' });
+const expertPrompt = ref('');
+const guided = ref<GuidedContext>({ issue: '', region: '', targetObject: '', occurredDate: '', extra: '' });
 const loading = ref(false);
 const session = ref<Record<string, any> | null>(null);
 const diagnosis = ref<Record<string, any> | null>(null);
@@ -38,7 +38,7 @@ const messages = ref<Message[]>([
   {
     id: 'welcome',
     role: 'assistant',
-    text: '请选择专家模式或引导式客服模式。专家模式适合一次性输入完整上下文；引导模式会逐步补齐片区、船舶、时间等诊断参数。'
+    text: '请选择专家模式或引导式客服模式。专家模式适合一次性输入完整上下文；引导模式会逐步补齐必要参数。'
   }
 ]);
 
@@ -46,7 +46,7 @@ const missingFields = computed(() => {
   if (mode.value === 'expert') return [];
   return [
     ['region', '片区'],
-    ['vessel', '船舶'],
+    ['targetObject', '对象'],
     ['occurredDate', '发生日期']
   ].filter(([key]) => !guided.value[key as keyof GuidedContext]).map(([, label]) => label);
 });
@@ -56,7 +56,7 @@ const questionText = computed(() => {
   return [
     `问题：${guided.value.issue}`,
     guided.value.region ? `片区：${guided.value.region}` : '',
-    guided.value.vessel ? `船舶：${guided.value.vessel}` : '',
+    guided.value.targetObject ? `对象：${guided.value.targetObject}` : '',
     guided.value.occurredDate ? `日期：${guided.value.occurredDate}` : '',
     guided.value.extra ? `补充：${guided.value.extra}` : ''
   ].filter(Boolean).join('\n');
@@ -77,19 +77,9 @@ const results = computed(() => {
   const confidence = Number(caseDetail.value.confidenceScore || 0);
   return [
     {
-      title: String(caseDetail.value.rootCause || '疑似工程配置与现场状态不一致'),
+      title: String(caseDetail.value.rootCause || ''),
       confidence,
       evidence: '知识图谱路径、RAG 推理步骤、MCP 工具证据'
-    },
-    {
-      title: '设备状态正常但告警规则阈值或启用状态异常',
-      confidence: Math.max(confidence - 12, 0),
-      evidence: 'device.getStatus / alarm rule relation'
-    },
-    {
-      title: '日志链路延迟或统计任务未及时刷新',
-      confidence: Math.max(confidence - 24, 0),
-      evidence: 'log.searchErrors / statistics route'
     }
   ];
 });
@@ -116,7 +106,7 @@ async function runDiagnosis() {
   trace.value = null;
   try {
     append('user', questionText.value);
-    session.value = await api.createSession({ questionText: questionText.value, projectId: props.runtime.projectId, deviceId: 'TC-003' });
+    session.value = await api.createSession({ questionText: questionText.value, projectId: props.runtime.projectId });
     diagnosis.value = await api.startDiagnosis({ sessionId: session.value.sessionId, mockScenario: 'success' });
     caseDetail.value = await api.getCase(String(diagnosis.value.caseId));
     trace.value = await api.getTrace(String(diagnosis.value.traceId));
@@ -147,7 +137,7 @@ async function runDiagnosis() {
       <div v-if="mode === 'guided'" class="guided-form">
         <el-input v-model="guided.issue" placeholder="问题类型，例如：告警不准、设备离线、统计异常" />
         <el-input v-model="guided.region" placeholder="片区" />
-        <el-input v-model="guided.vessel" placeholder="船舶 / 设备对象" />
+        <el-input v-model="guided.targetObject" placeholder="对象（如设备 / 资产 / 人员等）" />
         <el-date-picker v-model="guided.occurredDate" type="date" value-format="YYYY-MM-DD" placeholder="发生日期" />
         <el-input v-model="guided.extra" type="textarea" :rows="3" placeholder="补充现象" />
         <el-alert v-if="missingFields.length" :title="`待补充：${missingFields.join('、')}`" type="warning" :closable="false" show-icon />

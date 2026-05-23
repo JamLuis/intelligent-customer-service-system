@@ -15,13 +15,23 @@ import com.company.smartsupport.common.SmartSupportException;
 import com.company.smartsupport.integration.AiServiceClient;
 import com.company.smartsupport.integration.McpServerClient;
 
+/**
+ * 仅保留当前仍被 Controller 引用的占位实现：
+ *   - GraphController:           updateGraphDraft / graphAction
+ *   - DiagnosisController:       startDiagnosis / getCase
+ *   - SupportSessionController:  createSession / updateSessionContext
+ *   - TraceController:           getTrace / traceSteps / traceMcpCalls
+ *   - McpController:             capabilities / capabilityImpact / updateCapabilityStatus / updateGraphMcpMapping / updateRoute / submitFeedback
+ *   - Approval/Knowledge:        placeholder
+ * 不再硬编码任何业务本体（设备号、船舶、告警规则、关系类型等），保持平台通用性。
+ * 真实业务数据来自 GraphTaxonomyService / GraphAssetService / KnowledgeService 等真实服务。
+ */
 @Service
 public class MockSupportService {
 
     private final Map<String, Map<String, Object>> sessions = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> cases = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> traces = new LinkedHashMap<>();
-    private final Map<String, Map<String, Object>> sources = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> capabilities = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> routes = new LinkedHashMap<>();
     private final AiServiceClient aiServiceClient;
@@ -30,8 +40,6 @@ public class MockSupportService {
     public MockSupportService(AiServiceClient aiServiceClient, McpServerClient mcpServerClient) {
         this.aiServiceClient = aiServiceClient;
         this.mcpServerClient = mcpServerClient;
-        seedCapabilities();
-        seedRoute();
     }
 
     public Map<String, Object> createSession(Map<String, Object> body, String projectId) {
@@ -40,14 +48,14 @@ public class MockSupportService {
             throw new SmartSupportException("ICSS-DIAG-400-QUESTION_EMPTY", "问题不能为空");
         }
         String sessionId = uuid();
-        boolean contextRequired = "context_required".equals(body.get("mockScenario")) || questionText.contains("缺少");
+        boolean contextRequired = "context_required".equals(body.get("mockScenario"));
         Map<String, Object> session = mapOf(
                 "sessionId", sessionId,
                 "projectId", projectId,
+                "questionText", questionText,
                 "status", contextRequired ? "waiting_context" : "ready",
-                "issueCategory", questionText.contains("日志") ? "log" : "alarm",
-                "entities", List.of(mapOf("type", "deviceId", "value", body.getOrDefault("deviceId", "TC-003"), "confidence", 0.92)),
-                "missingFields", contextRequired ? List.of("deviceId", "timeRange") : List.of(),
+                "entities", List.of(),
+                "missingFields", contextRequired ? List.of("context") : List.of(),
                 "createdAt", now());
         sessions.put(sessionId, session);
         return session;
@@ -57,7 +65,7 @@ public class MockSupportService {
         Map<String, Object> session = require(sessions, sessionId, "ICSS-DIAG-404-SESSION_NOT_FOUND", "会话不存在");
         session.put("status", "ready");
         session.put("missingFields", List.of());
-        session.put("followUpAnswer", body.getOrDefault("followUpAnswer", "已补充设备和时间范围"));
+        session.put("followUpAnswer", body.getOrDefault("followUpAnswer", ""));
         return session;
     }
 
@@ -65,37 +73,39 @@ public class MockSupportService {
         String sessionId = stringValue(body, "sessionId");
         Map<String, Object> session = require(sessions, sessionId, "ICSS-DIAG-404-SESSION_NOT_FOUND", "会话不存在");
         if ("waiting_context".equals(session.get("status"))) {
-            throw new SmartSupportException("ICSS-DIAG-409-CONTEXT_REQUIRED", "诊断上下文不足，请补充设备或时间范围");
+            throw new SmartSupportException("ICSS-DIAG-409-CONTEXT_REQUIRED", "诊断上下文不足，请补充必要字段");
         }
         String caseId = uuid();
         String traceId = uuid();
         boolean degraded = "mcp_degraded".equals(body.get("mockScenario"));
         Map<String, Object> aiResult = aiServiceClient.runDiagnosis(mapOf(
-            "sessionId", sessionId,
-            "questionText", session.getOrDefault("questionText", ""),
-            "projectId", projectId,
-            "mockScenario", body.get("mockScenario"))).orElse(Map.of());
-        Map<String, Object> mcpResult = mcpServerClient.invoke("device.getStatus", mapOf(
-            "projectId", projectId,
-            "deviceId", "TC-003",
-            "mockScenario", body.get("mockScenario"))).orElse(Map.of());
+                "sessionId", sessionId,
+                "questionText", session.getOrDefault("questionText", ""),
+                "projectId", projectId,
+                "mockScenario", body.get("mockScenario"))).orElse(Map.of());
+        Map<String, Object> mcpResult = mcpServerClient.invoke("diagnostic.placeholder", mapOf(
+                "projectId", projectId,
+                "mockScenario", body.get("mockScenario"))).orElse(Map.of());
         Map<String, Object> trace = createTrace(traceId, caseId, projectId, degraded, aiResult, mcpResult);
         Map<String, Object> diagnosticCase = mapOf(
                 "caseId", caseId,
                 "sessionId", sessionId,
                 "projectId", projectId,
                 "status", "concluded",
-            "rootCause", aiResult.getOrDefault("rootCause", degraded ? "实时日志查询超时，已基于静态知识给出降级诊断" : "告警规则阈值配置与设备状态不一致，导致报警未触发"),
-            "confidenceScore", aiResult.getOrDefault("confidenceScore", degraded ? 71.5 : 88.0),
-                "evidenceItems", List.of(
-                        mapOf("source", "graph", "summary", "设备 TC-003 绑定告警规则 AR-17", "confidence", 0.91),
-                mapOf("source", "mcp", "summary", mcpResult.getOrDefault("summary", degraded ? "log.searchErrors timeout" : "device.getStatus 返回在线"), "confidence", degraded ? 0.4 : 0.87)),
-            "recommendedActions", aiResult.getOrDefault("recommendedActions", List.of(mapOf("actionCode", "CHECK_ALARM_RULE", "riskLevel", "L1", "summary", "核对告警规则阈值与启用状态"))),
+                "rootCause", aiResult.getOrDefault("rootCause", degraded ? "实时通道超时，已基于静态知识给出降级诊断" : "未提供真实诊断结果，请实现 AI Service /diagnosis/run"),
+                "confidenceScore", aiResult.getOrDefault("confidenceScore", degraded ? 60.0 : 70.0),
+                "evidenceItems", aiResult.getOrDefault("evidenceItems", List.of()),
+                "recommendedActions", aiResult.getOrDefault("recommendedActions", List.of()),
                 "latestTrace", mapOf("traceId", traceId, "status", trace.get("status"), "degraded", degraded));
         cases.put(caseId, diagnosticCase);
         traces.put(traceId, trace);
         session.put("status", "analyzed");
-        return mapOf("caseId", caseId, "traceId", traceId, "caseStatus", "concluded", "traceStatus", trace.get("status"), "sseUrl", "/api/v1/diagnosis/cases/" + caseId + "/events");
+        return mapOf(
+                "caseId", caseId,
+                "traceId", traceId,
+                "caseStatus", "concluded",
+                "traceStatus", trace.get("status"),
+                "sseUrl", "/api/v1/diagnosis/cases/" + caseId + "/events");
     }
 
     public Map<String, Object> getCase(String caseId) {
@@ -123,220 +133,21 @@ public class MockSupportService {
         return PageResult.of(listValue(trace.get("mcpCalls")), pageNo, pageSize);
     }
 
-    public Map<String, Object> createKnowledgeSource(Map<String, Object> body, String projectId) {
-        String sourceType = stringValue(body, "sourceType");
-        if (!List.of("doc", "docx", "xls", "xlsx", "pdf", "jpg", "png", "text").contains(sourceType)) {
-            throw new SmartSupportException("ICSS-KNOW-400-UNSUPPORTED_SOURCE_TYPE", "知识源类型不支持");
-        }
-        String sourceId = uuid();
-        Map<String, Object> source = mapOf(
-                "sourceId", sourceId,
-                "projectId", projectId,
-                "sourceType", sourceType,
-                "graphCategoryId", body.getOrDefault("graphCategoryId", "device-alarm"),
-                "graphCategoryName", body.getOrDefault("graphCategoryName", "设备与告警"),
-                "fileName", body.getOrDefault("fileName", sourceType.equals("text") ? "raw-text.txt" : "upload." + sourceType),
-                "status", "graph_ready",
-                "parserStatus", "success",
-                "extractStatus", "success",
-                "graphBuildStatus", "success",
-                "createdAt", now());
-            aiServiceClient.ingestKnowledge(mapOf(
-                "sourceId", sourceId,
-                "sourceType", sourceType,
-                "graphCategoryId", source.get("graphCategoryId"),
-                "rawText", body.get("rawText"),
-                "projectId", projectId)).ifPresent(result -> {
-                    source.put("parserStatus", result.getOrDefault("parserStatus", source.get("parserStatus")));
-                    source.put("extractStatus", result.getOrDefault("extractStatus", source.get("extractStatus")));
-                    source.put("graphBuildStatus", result.getOrDefault("graphBuildStatus", source.get("graphBuildStatus")));
-                    source.put("aiTasks", result.getOrDefault("tasks", List.of()));
-                });
-        sources.put(sourceId, source);
-        return source;
-    }
-
-    public PageResult<Map<String, Object>> listKnowledgeSources(int pageNo, int pageSize) {
-        return PageResult.of(new ArrayList<>(sources.values()), pageNo, pageSize);
-    }
-
-    public PageResult<Map<String, Object>> ingestionTasks(String sourceId, int pageNo, int pageSize) {
-        require(sources, sourceId, "ICSS-KNOW-404-SOURCE_NOT_FOUND", "知识源不存在");
-        List<Map<String, Object>> tasks = List.of(
-                mapOf("taskId", uuid(), "taskType", "parse", "status", "success", "progress", 100, "resultPayload", mapOf("pages", 12), "errorMessage", null, "startedAt", now(), "completedAt", now()),
-                mapOf("taskId", uuid(), "taskType", "graph_build", "status", "success", "progress", 100, "resultPayload", mapOf("nodes", 28, "edges", 41), "errorMessage", null, "startedAt", now(), "completedAt", now()));
-        return PageResult.of(tasks, pageNo, pageSize);
-    }
-
-    public Map<String, Object> retryKnowledgeSource(String sourceId) {
-        require(sources, sourceId, "ICSS-KNOW-404-SOURCE_NOT_FOUND", "知识源不存在");
-        return mapOf("sourceId", sourceId, "taskId", uuid(), "status", "running", "progress", 0);
-    }
-
-    public Map<String, Object> graphCategories() {
-        return mapOf(
-                "categories", graphCategoryItems(),
-                "entityTypes", List.of(
-                        mapOf("type", "region", "label", "地区", "group", "space"),
-                        mapOf("type", "vessel", "label", "船舶", "group", "asset"),
-                        mapOf("type", "crew", "label", "船员", "group", "people"),
-                        mapOf("type", "device", "label", "设备", "group", "asset"),
-                        mapOf("type", "deviceType", "label", "设备类型", "group", "taxonomy"),
-                        mapOf("type", "alarm", "label", "告警", "group", "event"),
-                        mapOf("type", "protocol", "label", "协议", "group", "integration"),
-                        mapOf("type", "alarmRule", "label", "告警规则", "group", "rule"),
-                        mapOf("type", "system", "label", "系统", "group", "system")),
-                "relationTypes", List.of(
-                        mapOf("type", "LOCATED_IN", "label", "归属地区", "from", "vessel", "to", "region"),
-                        mapOf("type", "CREW_ON", "label", "船员任职", "from", "crew", "to", "vessel"),
-                        mapOf("type", "INSTALLED_ON", "label", "设备安装于船舶", "from", "device", "to", "vessel"),
-                        mapOf("type", "HAS_DEVICE_TYPE", "label", "设备类型", "from", "device", "to", "deviceType"),
-                        mapOf("type", "RAISED_BY", "label", "告警来源设备", "from", "alarm", "to", "device"),
-                        mapOf("type", "USES_PROTOCOL", "label", "设备协议", "from", "device", "to", "protocol"),
-                        mapOf("type", "BOUND_TO", "label", "规则绑定", "from", "device", "to", "alarmRule")));
-    }
-
-    public PageResult<Map<String, Object>> graphAssets(String graphCategoryId, String entityType, String relationType, int pageNo, int pageSize) {
-        List<Map<String, Object>> items = graphAssetItems().stream()
-                .filter(item -> !StringUtils.hasText(graphCategoryId) || graphCategoryId.equals(item.get("graphCategoryId")))
-                .filter(item -> !StringUtils.hasText(entityType) || graphContainsEntityType(item, entityType))
-                .filter(item -> !StringUtils.hasText(relationType) || graphContainsRelationType(item, relationType))
-                .toList();
-        return PageResult.of(items, pageNo, pageSize);
-    }
-
-    public Map<String, Object> graphAssetDetail(String graphId) {
-        return graphAssetItems().stream()
-                .filter(item -> graphId.equals(item.get("graphId")))
-                .findFirst()
-                .map(item -> {
-                    Map<String, Object> detail = new LinkedHashMap<>(item);
-                    detail.put("neo4jGraphRef", "neo4j://graph/" + graphId);
-                    detail.put("revisions", List.of(mapOf("revisionId", detail.get("activeRevisionId"), "status", "published")));
-                    return detail;
-                })
-                .orElseGet(() -> mapOf("graphId", graphId, "graphName", "未知子图", "status", "draft", "nodes", List.of(), "edges", List.of(), "revisions", List.of()));
-    }
-
     public Map<String, Object> updateGraphDraft(String graphId, Map<String, Object> body) {
-        return mapOf("graphId", graphId, "draftVersion", "draft-" + System.currentTimeMillis(), "status", "reviewing", "editReason", body.getOrDefault("editReason", "mock draft update"));
+        return mapOf(
+                "graphId", graphId,
+                "draftVersion", "draft-" + System.currentTimeMillis(),
+                "status", "reviewing",
+                "editReason", body.getOrDefault("editReason", ""));
     }
 
     public Map<String, Object> graphAction(String graphId, Map<String, Object> body) {
         String action = stringValue(body, "action");
-        return mapOf("graphId", graphId, "graphStatus", "rollback".equals(action) ? "rolled_back" : "published", "activeVersion", body.getOrDefault("targetVersion", "rev-3"));
+        return mapOf(
+                "graphId", graphId,
+                "graphStatus", "rollback".equals(action) ? "rolled_back" : "published",
+                "activeVersion", body.getOrDefault("targetVersion", ""));
     }
-
-        private List<Map<String, Object>> graphCategoryItems() {
-        return List.of(
-            mapOf("categoryId", "geo-vessel", "categoryName", "地区与船舶", "domain", "asset", "description", "片区、港区、船舶归属和调度范围"),
-            mapOf("categoryId", "vessel-crew", "categoryName", "船舶与船员", "domain", "people", "description", "船舶、船员、岗位和当班关系"),
-            mapOf("categoryId", "vessel-device", "categoryName", "船舶与设备绑定", "domain", "asset", "description", "船舶上的设备安装、拆换和绑定关系"),
-            mapOf("categoryId", "device-alarm", "categoryName", "设备与告警", "domain", "event", "description", "告警来源设备、告警规则和阈值关系"),
-            mapOf("categoryId", "device-protocol", "categoryName", "设备与协议", "domain", "integration", "description", "设备类型、接入协议、字段映射和采集来源"));
-        }
-
-        private List<Map<String, Object>> graphAssetItems() {
-        return List.of(
-            mapOf(
-                "graphId", "graph-region-vessel",
-                "graphName", "华东片区船舶关系图",
-                "graphCategoryId", "geo-vessel",
-                "graphCategoryName", "地区与船舶",
-                "status", "published",
-                "nodes", List.of(
-                    mapOf("id", "region:east", "label", "华东片区", "type", "region"),
-                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
-                    mapOf("id", "vessel:MINX-002", "label", "民星 002", "type", "vessel")),
-                "edges", List.of(
-                    mapOf("source", "vessel:MINX-001", "target", "region:east", "type", "LOCATED_IN"),
-                    mapOf("source", "vessel:MINX-002", "target", "region:east", "type", "LOCATED_IN")),
-                "sourceRefs", List.of("knowledge:vessel-registry"),
-                "confidence", 0.93,
-                "activeRevisionId", "rev-region-4"),
-            mapOf(
-                "graphId", "graph-vessel-crew",
-                "graphName", "船舶船员任职关系图",
-                "graphCategoryId", "vessel-crew",
-                "graphCategoryName", "船舶与船员",
-                "status", "published",
-                "nodes", List.of(
-                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
-                    mapOf("id", "crew:ZHANGSAN", "label", "张三 船长", "type", "crew"),
-                    mapOf("id", "crew:LISI", "label", "李四 轮机员", "type", "crew")),
-                "edges", List.of(
-                    mapOf("source", "crew:ZHANGSAN", "target", "vessel:MINX-001", "type", "CREW_ON"),
-                    mapOf("source", "crew:LISI", "target", "vessel:MINX-001", "type", "CREW_ON")),
-                "sourceRefs", List.of("knowledge:crew-duty-roster"),
-                "confidence", 0.88,
-                "activeRevisionId", "rev-crew-2"),
-            mapOf(
-                "graphId", "graph-vessel-device",
-                "graphName", "船舶设备绑定关系图",
-                "graphCategoryId", "vessel-device",
-                "graphCategoryName", "船舶与设备绑定",
-                "status", "published",
-                "nodes", List.of(
-                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
-                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
-                    mapOf("id", "deviceType:temperature", "label", "温度采集器", "type", "deviceType")),
-                "edges", List.of(
-                    mapOf("source", "device:TC-003", "target", "vessel:MINX-001", "type", "INSTALLED_ON"),
-                    mapOf("source", "device:TC-003", "target", "deviceType:temperature", "type", "HAS_DEVICE_TYPE")),
-                "sourceRefs", List.of("knowledge:device-binding-sheet"),
-                "confidence", 0.91,
-                "activeRevisionId", "rev-device-7"),
-            mapOf(
-                "graphId", "graph-device-alarm",
-                "graphName", "设备告警关系子图",
-                "graphCategoryId", "device-alarm",
-                "graphCategoryName", "设备与告警",
-                "status", "published",
-                "nodes", List.of(
-                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
-                    mapOf("id", "alarm:OVERLOAD", "label", "超载告警", "type", "alarm"),
-                    mapOf("id", "rule:AR-17", "label", "告警规则 AR-17", "type", "alarmRule")),
-                "edges", List.of(
-                    mapOf("source", "alarm:OVERLOAD", "target", "device:TC-003", "type", "RAISED_BY"),
-                    mapOf("source", "device:TC-003", "target", "rule:AR-17", "type", "BOUND_TO")),
-                "sourceRefs", List.of("knowledge:alarm-rule-doc"),
-                "confidence", 0.89,
-                "activeRevisionId", "rev-3"),
-            mapOf(
-                "graphId", "graph-device-protocol",
-                "graphName", "设备协议接入关系图",
-                "graphCategoryId", "device-protocol",
-                "graphCategoryName", "设备与协议",
-                "status", "draft",
-                "nodes", List.of(
-                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
-                    mapOf("id", "deviceType:temperature", "label", "温度采集器", "type", "deviceType"),
-                    mapOf("id", "protocol:MQTT-JSON", "label", "MQTT JSON 协议", "type", "protocol")),
-                "edges", List.of(
-                    mapOf("source", "device:TC-003", "target", "protocol:MQTT-JSON", "type", "USES_PROTOCOL"),
-                    mapOf("source", "device:TC-003", "target", "deviceType:temperature", "type", "HAS_DEVICE_TYPE")),
-                "sourceRefs", List.of("knowledge:device-protocol-spec"),
-                "confidence", 0.84,
-                "activeRevisionId", "draft-protocol-1"));
-        }
-
-        @SuppressWarnings("unchecked")
-        private boolean graphContainsEntityType(Map<String, Object> graph, String entityType) {
-        Object nodes = graph.get("nodes");
-        if (!(nodes instanceof List<?> list)) {
-            return false;
-        }
-        return ((List<Map<String, Object>>) list).stream().anyMatch(node -> entityType.equals(node.get("type")));
-        }
-
-        @SuppressWarnings("unchecked")
-        private boolean graphContainsRelationType(Map<String, Object> graph, String relationType) {
-        Object edges = graph.get("edges");
-        if (!(edges instanceof List<?> list)) {
-            return false;
-        }
-        return ((List<Map<String, Object>>) list).stream().anyMatch(edge -> relationType.equals(edge.get("type")));
-        }
 
     public PageResult<Map<String, Object>> capabilities(int pageNo, int pageSize) {
         mcpServerClient.tools().ifPresent(tools -> {
@@ -359,7 +170,11 @@ public class MockSupportService {
 
     public Map<String, Object> capabilityImpact(String capabilityId) {
         Map<String, Object> capability = require(capabilities, capabilityId, "ICSS-MCP-404-CAPABILITY_NOT_FOUND", "MCP 能力不存在");
-        return mapOf("capabilityId", capabilityId, "capabilityCode", capability.get("capabilityCode"), "impactRoutes", List.of(mapOf("routeId", "route-device-offline", "routeName", "设备离线诊断路径", "projectId", "P001", "issueCategory", "device")), "recentCallCount7d", 128);
+        return mapOf(
+                "capabilityId", capabilityId,
+                "capabilityCode", capability.get("capabilityCode"),
+                "impactRoutes", List.of(),
+                "recentCallCount7d", 0);
     }
 
     public Map<String, Object> updateCapabilityStatus(String capabilityId, Map<String, Object> body) {
@@ -374,11 +189,18 @@ public class MockSupportService {
     }
 
     public Map<String, Object> updateGraphMcpMapping(String mappingId, Map<String, Object> body) {
-        return mapOf("mappingId", mappingId, "status", "enabled", "capabilityIds", body.getOrDefault("capabilityIds", List.of("cap-device-status")), "updatedAt", now());
+        return mapOf(
+                "mappingId", mappingId,
+                "status", "enabled",
+                "capabilityIds", body.getOrDefault("capabilityIds", List.of()),
+                "updatedAt", now());
     }
 
     public Map<String, Object> updateRoute(String routeId, Map<String, Object> body) {
-        Map<String, Object> route = routes.computeIfAbsent(routeId, id -> mapOf("routeId", id, "routeName", "Mock 诊断路径", "version", 1));
+        Map<String, Object> route = routes.computeIfAbsent(routeId, id -> mapOf(
+                "routeId", id,
+                "routeName", "placeholder route",
+                "version", 1));
         String action = stringValue(body, "action");
         route.put("routeStatus", switch (action) {
             case "disable" -> "disabled";
@@ -393,46 +215,39 @@ public class MockSupportService {
     public Map<String, Object> submitFeedback(Map<String, Object> body) {
         String rating = stringValue(body, "rating");
         boolean rebuildRequired = "invalid".equals(rating) || "partial".equals(rating);
-        return mapOf("evaluationId", uuid(), "rebuildRequired", rebuildRequired, "routeStatus", rebuildRequired ? "reviewing" : "active");
+        return mapOf(
+                "evaluationId", uuid(),
+                "rebuildRequired", rebuildRequired,
+                "routeStatus", rebuildRequired ? "reviewing" : "active");
     }
 
     public Map<String, Object> placeholder(String status, String reason) {
         return mapOf("status", status, "reason", reason, "mock", true);
     }
 
-        private Map<String, Object> createTrace(String traceId, String caseId, String projectId, boolean degraded, Map<String, Object> aiResult, Map<String, Object> mcpResult) {
-        Object graphPaths = aiResult.getOrDefault("graphPaths", List.of(mapOf("nodes", List.of("device:TC-003", "alarmRule:AR-17"), "relation", "BOUND_TO", "sourceRef", "graph-device-alarm")));
-        Object reasoningSteps = aiResult.getOrDefault("reasoningSteps", List.of(
-            mapOf("stepId", uuid(), "stepOrder", 1, "stepType", "graph", "stepName", "查询设备告警关系", "status", "success", "inputSummary", "deviceId=TC-003", "outputSummary", "命中告警规则 AR-17", "durationMs", 42),
-            mapOf("stepId", uuid(), "stepOrder", 2, "stepType", "mcp", "stepName", "查询设备状态", "status", degraded ? "failed" : "success", "inputSummary", "device.getStatus", "outputSummary", degraded ? "timeout" : "online", "durationMs", degraded ? 5000 : 87)));
+    private Map<String, Object> createTrace(String traceId, String caseId, String projectId, boolean degraded, Map<String, Object> aiResult, Map<String, Object> mcpResult) {
+        Object graphPaths = aiResult.getOrDefault("graphPaths", List.of());
+        Object reasoningSteps = aiResult.getOrDefault("reasoningSteps", List.of());
+        Object mcpCalls = List.of(mapOf(
+                "callId", uuid(),
+                "capabilityId", "cap-placeholder",
+                "capabilityCode", "diagnostic.placeholder",
+                "status", mcpResult.getOrDefault("status", degraded ? "timeout" : "success"),
+                "requestSummary", "",
+                "responseSummary", mcpResult.getOrDefault("summary", ""),
+                "durationMs", degraded ? 5000 : 0));
         return mapOf(
                 "traceId", traceId,
                 "caseId", caseId,
-                "routeId", "route-device-alarm",
+                "routeId", "",
                 "projectId", projectId,
-            "status", aiResult.getOrDefault("status", degraded ? "partial" : "completed"),
-            "graphPaths", graphPaths,
-            "reasoningSteps", reasoningSteps,
-            "mcpCalls", List.of(mapOf("callId", uuid(), "capabilityId", "cap-device-status", "capabilityCode", "device.getStatus", "status", mcpResult.getOrDefault("status", degraded ? "timeout" : "success"), "requestSummary", "deviceId=TC-003", "responseSummary", mcpResult.getOrDefault("summary", degraded ? "查询超时" : "设备在线，心跳正常"), "durationMs", degraded ? 5000 : 87)),
+                "status", aiResult.getOrDefault("status", degraded ? "partial" : "completed"),
+                "graphPaths", graphPaths,
+                "reasoningSteps", reasoningSteps,
+                "mcpCalls", mcpCalls,
                 "degraded", degraded,
-                "failureReason", degraded ? "log.searchErrors timeout，已降级为静态知识诊断" : null,
-                "durationMs", degraded ? 5280 : 156);
-    }
-
-    private void seedCapabilities() {
-        addCapability("cap-device-status", "device.getStatus", "设备状态查询", "device", "L0", "enabled");
-        addCapability("cap-alarm-rules", "alarm.getRules", "告警规则查询", "alarm", "L0", "enabled");
-        addCapability("cap-config-snapshot", "config.getSnapshot", "配置快照查询", "config", "L0", "enabled");
-        addCapability("cap-log-errors", "log.searchErrors", "错误日志查询", "log", "L0", "enabled");
-        addCapability("cap-statistics-rebuild", "statistics.rebuild", "统计重算", "statistics", "L4", "draft");
-    }
-
-    private void addCapability(String id, String code, String name, String category, String riskLevel, String status) {
-        capabilities.put(id, mapOf("capabilityId", id, "capabilityCode", code, "capabilityName", name, "category", category, "riskLevel", riskLevel, "status", status, "lastHealthStatus", "healthy", "boundary", "V0.1 mock capability"));
-    }
-
-    private void seedRoute() {
-        routes.put("route-device-alarm", mapOf("routeId", "route-device-alarm", "routeName", "设备告警诊断路径", "routeStatus", "active", "version", 1));
+                "failureReason", degraded ? "实时通道不可用，已降级" : null,
+                "durationMs", degraded ? 5000 : 0);
     }
 
     private Map<String, Object> require(Map<String, Map<String, Object>> store, String id, String code, String message) {
@@ -445,14 +260,9 @@ public class MockSupportService {
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> listValue(Object value) {
         if (value instanceof List<?> list) {
-            return castList(list);
+            return (List<Map<String, Object>>) list;
         }
         return List.of();
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> castList(List<?> list) {
-        return (List<Map<String, Object>>) list;
     }
 
     private String stringValue(Map<String, Object> body, String key) {

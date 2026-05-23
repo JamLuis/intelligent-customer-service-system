@@ -55,17 +55,10 @@ const relationTarget = ref('');
 const relationType = ref('RELATED_TO');
 
 const graphId = computed(() => props.graph?.graphId || 'draft-graph');
-const entityTypeOptions = computed(() => props.entityTypes?.length ? props.entityTypes : [
-  { label: '设备', type: 'device' },
-  { label: '告警规则', type: 'alarmRule' },
-  { label: '船舶', type: 'vessel' },
-  { label: '配置', type: 'config' },
-  { label: '系统', type: 'system' }
-]);
-const relationTypeOptions = computed(() => props.relationTypes?.length ? props.relationTypes : [
-  { label: '关联', type: 'RELATED_TO' },
-  { label: '绑定', type: 'BOUND_TO' }
-]);
+// 类型选项必须来自父组件 props（最终来自 GET /api/v1/graphs/assets/categories 返回的本租户 taxonomy）。
+// 严禁在前端硬编码任何业务实体类型 / 关系类型；缺失时只回退到空列表，由 UI 提示用户先注册 taxonomy。
+const entityTypeOptions = computed(() => props.entityTypes ?? []);
+const relationTypeOptions = computed(() => props.relationTypes ?? []);
 
 const sourceOptions = computed<{ id: string; label: string }[]>(() => {
   return nodes.value.map((node) => ({ id: String(node.id), label: String(node.data?.label || node.id) }));
@@ -238,7 +231,7 @@ watch(
       <aside class="graph-side-panel">
         <div class="side-section">
           <strong>新增实体</strong>
-          <el-input v-model="entityLabel" placeholder="实体名称，如 设备 TC-003" />
+          <el-input v-model="entityLabel" placeholder="实体名称" />
           <el-select v-model="entityType" placeholder="实体类型">
             <el-option v-for="item in entityTypeOptions" :key="item.type" :label="item.label || item.type" :value="item.type" />
           </el-select>
@@ -250,7 +243,7 @@ watch(
           <el-select v-model="relationSource" filterable placeholder="起点实体">
             <el-option v-for="item in sourceOptions" :key="item.id" :label="item.label" :value="item.id" />
           </el-select>
-          <el-select v-model="relationType" filterable allow-create placeholder="关系类型，如 BOUND_TO">
+          <el-select v-model="relationType" filterable allow-create placeholder="关系类型">
             <el-option v-for="item in relationTypeOptions" :key="item.type" :label="item.label || item.type" :value="item.type" />
           </el-select>
           <el-select v-model="relationTarget" filterable placeholder="终点实体">

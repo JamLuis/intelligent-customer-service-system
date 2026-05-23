@@ -9,12 +9,8 @@ const props = defineProps<{
   runtime: RuntimeConfig;
 }>();
 
-const tickets = ref<Record<string, any>[]>([
-  { ticketId: 'TCK-1001', issue: '告警不准', object: 'TC-003', status: 'concluded', confidence: 88, traceId: 'mock-trace-1001' },
-  { ticketId: 'TCK-1002', issue: '设备离线', object: 'AIS-21', status: 'waiting_context', confidence: 0, traceId: '-' },
-  { ticketId: 'TCK-1003', issue: '统计异常', object: '月报任务', status: 'reviewing', confidence: 72, traceId: 'mock-trace-1003' }
-]);
-const activeTicket = ref<Record<string, any> | null>(tickets.value[0]);
+const tickets = ref<Record<string, any>[]>([]);
+const activeTicket = ref<Record<string, any> | null>(null);
 const trace = ref<Record<string, any> | null>(null);
 const loading = ref(false);
 
@@ -26,14 +22,14 @@ async function createMockTicket() {
   loading.value = true;
   syncRuntime();
   try {
-    const session = await api.createSession({ questionText: '告警不准，片区东港，船舶测试船，日期今天', deviceId: 'TC-003' });
+    const session = await api.createSession({ questionText: '联调测试问题描述' });
     const diagnosis = await api.startDiagnosis({ sessionId: session.sessionId, mockScenario: 'success' });
     const item = {
       ticketId: `TCK-${String(tickets.value.length + 1001)}`,
-      issue: '告警不准',
-      object: 'TC-003',
+      issue: '联调测试',
+      object: '-',
       status: diagnosis.caseStatus,
-      confidence: 88,
+      confidence: 0,
       caseId: diagnosis.caseId,
       traceId: diagnosis.traceId
     };

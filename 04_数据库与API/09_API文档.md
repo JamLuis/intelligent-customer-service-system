@@ -218,7 +218,7 @@ Query：`keyword`、`graphCategoryId`、`entityType`、`relationType`、`version
 
 成功响应 data：`categories`、`entityTypes`、`relationTypes`。
 
-首批分类：`geo-vessel` 地区与船舶、`vessel-crew` 船舶与船员、`vessel-device` 船舶与设备绑定、`device-alarm` 设备与告警、`device-protocol` 设备与协议。
+> 平台不内置任何业务分类与本体；返回内容完全由租户通过 KG-ADMIN-* 接口（见 09J）注册得来。仅 `SourceBlock`、`Document`、`Section` 三类受保护实体与 `HAS_EVIDENCE`、`HAS_SECTION`、`IN_SECTION` 三类受保护关系由系统强制存在。
 
 错误码：`ICSS-GRAPH-400-INVALID_QUERY`。
 
