@@ -7,7 +7,7 @@
 - 编号规则：接口编号与 01_需求与业务分析/04D_产品交付衔接清单.md 保持一致；需要拆分的查询能力作为同一接口下的子路径，不新增产品编号。
 - 接口边界：V0.1 使用 Mock + Adapter，真实 wnx 接入后只替换 Adapter / capability，不改变前端 API。
 - 不包含范围：真实生产写操作、完整审批流执行、直接修改 wnx-serve 生产配置。
-- 关联文档：09B_接口规范.md、09C_错误码登记表.md、09D_Mock场景清单.md、09E_接口字段映射表.md、09F_MCP能力契约.md、09G_SSE事件契约.md。
+- 关联文档：09B_接口规范.md、09C_错误码登记表.md、09D_Mock场景清单.md、09E_接口字段映射表.md、09F_MCP能力契约.md、09G_SSE事件契约.md、09J_真实知识图谱API补充契约.md。
 
 ## 2. 接口清单
 
@@ -33,6 +33,8 @@
 | API-017 | updateGraphMcpMapping | PUT | `/api/v1/graph-mcp-mappings/{mappingId}` | `mcp:update_mapping` | P0 设计占位 |
 | API-018 | updateRouteTemplate | PATCH | `/api/v1/routes/{routeId}/status` | `route:publish` / `route:disable` | P0 |
 | API-019 | submitAnswerFeedback | POST | `/api/v1/routes/evaluations` | `route:feedback` | P0 |
+
+真实知识图谱 V0.2 增量接口 `KG-001` ~ `KG-015` 已单独收敛到 `09J_真实知识图谱API补充契约.md`，后续后端和前端实现应优先引用 09J，不得继续按 Mock JSON 图谱扩展接口。
 
 ## 3. 通用要求
 
