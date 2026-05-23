@@ -10,6 +10,7 @@ AI_PORT="${AI_PORT:-8100}"
 MCP_PORT="${MCP_PORT:-3202}"
 BACKEND_PORT="${BACKEND_PORT:-8088}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
 MAVEN_SETTINGS="${MAVEN_SETTINGS:-$ROOT_DIR/../app-ship-alarm/settings.xml}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$ROOT_DIR/.env}"
 
@@ -41,6 +42,39 @@ java_home() {
   else
     printf '%s' "${JAVA_HOME:-}"
   fi
+}
+
+node_bin_dir() {
+  local candidate
+
+  if [[ -n "${NODE_BIN_DIR:-}" && -x "$NODE_BIN_DIR/node" ]]; then
+    printf '%s' "$NODE_BIN_DIR"
+    return
+  fi
+
+  for candidate in \
+    "$HOME/.nvm/versions/node/v22.21.1/bin/node" \
+    "$HOME/.nvm/versions/node/v20.20.1/bin/node" \
+    "$HOME"/.nvm/versions/node/v*/bin/node \
+    /opt/homebrew/bin/node \
+    /usr/local/bin/node \
+    "$(command -v node 2>/dev/null || true)"; do
+    [[ -x "$candidate" ]] || continue
+    if "$candidate" -e "const major = Number(process.versions.node.split('.')[0]); process.exit(major >= Number(process.env.NODE_MIN_MAJOR || '$NODE_MIN_MAJOR') ? 0 : 1);" >/dev/null 2>&1; then
+      dirname "$candidate"
+      return
+    fi
+  done
+
+  log "Node.js $NODE_MIN_MAJOR+ not found; install Node 20.19+ or 22.12+"
+  exit 1
+}
+
+with_node_path() {
+  local node_dir="$1"
+  shift
+  printf 'export PATH=%q:"$PATH"; ' "$node_dir"
+  printf '%s' "$*"
 }
 
 start_process() {
@@ -78,6 +112,11 @@ stop_process() {
 
 install_node_dependencies() {
   require_command npm
+  local node_dir
+  node_dir="$(node_bin_dir)"
+  export PATH="$node_dir:$PATH"
+  log "using Node $(node -v) from $node_dir"
+
   if [[ ! -d "$ROOT_DIR/node_modules" ]]; then
     log "installing Node dependencies"
     (cd "$ROOT_DIR" && npm install)
@@ -144,12 +183,15 @@ start_all() {
     maven_settings_arg="-s '$MAVEN_SETTINGS'"
   fi
 
-  start_process "mcp-server-node" "PORT=$MCP_PORT npm run dev:mcp-node"
+  local node_dir
+  node_dir="$(node_bin_dir)"
+
+  start_process "mcp-server-node" "$(with_node_path "$node_dir" "PORT=$MCP_PORT npm run dev:mcp-node")"
   start_process "ai-service-python" "cd ai-service-python && .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $AI_PORT"
   start_process "backend-java" "export JAVA_HOME='$jdk_home'; export PATH=\"\$JAVA_HOME/bin:\$PATH\"; BACKEND_PORT=$BACKEND_PORT AI_SERVICE_BASE_URL=http://localhost:$AI_PORT MCP_SERVER_BASE_URL=http://localhost:$MCP_PORT mvn $maven_settings_arg -f backend-java/pom.xml spring-boot:run"
 
   if [[ -f "$ROOT_DIR/frontend/package.json" ]]; then
-    start_process "frontend" "cd frontend && npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT"
+    start_process "frontend" "$(with_node_path "$node_dir" "cd frontend && npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT")"
   else
     log "frontend/package.json not found, skip frontend"
   fi
