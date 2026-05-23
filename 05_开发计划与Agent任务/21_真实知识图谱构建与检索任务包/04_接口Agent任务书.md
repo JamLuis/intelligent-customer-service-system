@@ -1,0 +1,101 @@
+# 接口 Agent 任务书
+
+## 1. 角色边界
+
+接口 Agent 只负责 API 契约、请求响应、错误码、权限、Mock 场景和 SSE/状态事件说明，不写 Controller 实现、不改数据库 SQL、不改前端页面。
+
+## 2. 必读文件
+
+1. `03_技术方案与架构/07F_真实知识图谱构建与检索详细设计.md` §13、§14、§18、§22
+2. `04_数据库与API/09_API文档.md`
+3. `04_数据库与API/09B_接口规范.md`
+4. `04_数据库与API/09C_错误码登记表.md`
+5. `05_开发计划与Agent任务/21_真实知识图谱构建与检索任务包/02_任务总表.md`
+
+## 3. 输出位置
+
+| 类型 | 路径 |
+| --- | --- |
+| API 主文档 | `04_数据库与API/09_API文档.md` |
+| 错误码 | `04_数据库与API/09C_错误码登记表.md` |
+| Mock 场景 | `04_数据库与API/09D~09I` 中合适文件，或新增 `09J_真实知识图谱API补充契约.md` |
+
+## 4. 必须补齐的 API
+
+| 编号 | 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| KG-001 | GET | `/api/v1/graphs/taxonomy` | 图谱分类、本体、关系类型配置 |
+| KG-002 | POST | `/api/v1/knowledge/sources` | 创建知识源，必须带 graphCategoryId |
+| KG-003 | GET | `/api/v1/knowledge/sources/{sourceId}/blocks` | 查看解析块 |
+| KG-004 | GET | `/api/v1/knowledge/sources/{sourceId}/candidates` | 查看候选实体/关系 |
+| KG-005 | POST | `/api/v1/knowledge/sources/{sourceId}/actions` | parse/extract/build/publish/retry |
+| KG-006 | GET | `/api/v1/graphs/assets` | 分类/实体/关系筛选 |
+| KG-007 | GET | `/api/v1/graphs/assets/{graphId}` | 图谱详情，含 nodes/edges/sourceRefs/revisions |
+| KG-008 | PATCH | `/api/v1/graphs/assets/{graphId}/draft` | 保存草稿节点关系 |
+| KG-009 | POST | `/api/v1/graphs/assets/{graphId}/versions/actions` | publish/rollback/deprecate |
+| KG-010 | POST | `/api/v1/graphs/search/diagnosis` | 诊断检索子图 |
+| KG-011 | GET | `/api/v1/graphs/entities/{entityId}/neighbors` | 实体邻居 |
+| KG-012 | GET | `/api/v1/graphs/paths` | source-target 路径查询 |
+| KG-013 | GET | `/api/v1/graphs/evidence` | 证据块溯源 |
+| KG-014 | GET | `/api/v1/graphs/review-tasks` | 低置信度/冲突复核任务 |
+| KG-015 | PATCH | `/api/v1/graphs/review-tasks/{taskId}` | 复核通过/驳回/合并 |
+
+## 5. 每个 API 必须包含
+
+1. 业务说明。
+2. 请求头：`X-Project-Id`、`Idempotency-Key` 是否必填。
+3. 权限：查看、上传、编辑、发布、回滚、复核分别需要什么权限。
+4. 请求参数：字段名、类型、必填、枚举、长度。
+5. 响应结构：必须含 `sourceId`、`blockId`、`candidateId`、`graphId`、`revisionId`、`confidence`、`status` 等关键链路字段。
+6. 错误码：至少覆盖 400、403、404、409、422、500、502。
+7. Mock 场景：成功、低置信度、冲突、解析失败、越权、发布失败。
+
+## 6. 状态枚举要求
+
+必须明确以下状态，不允许前端/后端自行发明：
+
+```text
+knowledge_source: uploaded/parsing/extracted/graph_ready/published/failed
+knowledge_ingestion_task: pending/running/success/failed/canceled
+candidate: candidate/accepted/rejected/conflict/merged/reviewing
+graph_asset: draft/reviewing/published/deprecated/rolled_back
+review_task: pending/approved/rejected/merged
+```
+
+## 7. 错误码建议
+
+| 错误码 | 场景 |
+| --- | --- |
+| ICSS-KG-4001 | graphCategoryId 缺失或不存在 |
+| ICSS-KG-4002 | sourceType 不支持 |
+| ICSS-KG-4003 | 文件大小或格式超限 |
+| ICSS-KG-4031 | 无图谱查看权限 |
+| ICSS-KG-4032 | 无图谱发布/回滚权限 |
+| ICSS-KG-4041 | sourceId 不存在 |
+| ICSS-KG-4042 | graphId/revisionId 不存在 |
+| ICSS-KG-4091 | 存在未处理冲突，禁止发布 |
+| ICSS-KG-4092 | revision 并发冲突 |
+| ICSS-KG-4221 | 解析失败 |
+| ICSS-KG-4222 | 抽取结果为空 |
+| ICSS-KG-4223 | 候选关系不符合本体约束 |
+| ICSS-KG-5001 | Neo4j 写入失败 |
+| ICSS-KG-5002 | pgvector 查询失败 |
+| ICSS-KG-5021 | AI Service 解析/抽取服务不可用 |
+
+## 8. 禁止事项
+
+1. 不要把 API 响应设计成任意 JSON，无字段说明。
+2. 不要把候选实体和发布实体混在同一个状态里。
+3. 不要让 `draft` 图谱出现在诊断检索响应中。
+4. 不要省略 evidence/source 字段。
+5. 不要设计前端直接传 Cypher 的接口。
+
+## 9. 下游交接
+
+交接给后端/前端 Agent 时必须说明：
+
+1. 哪些接口先实现真实，哪些可保留 Mock。
+2. 每个接口的权限和幂等要求。
+3. graph node/edge 前端数据结构。
+4. 诊断检索返回的 `graphPaths` 与 `evidenceItems` 如何对应。
+5. 发布/回滚接口的并发控制方式。

@@ -6,7 +6,7 @@
 
 ## 2. 开发顺序总览
 
-当前状态：DEV-001 已完成；DEV-002 已完成 V0.1 P0 数据库设计与 API 契约；Docker 基础设施已验证通过并关闭；DEV-004 Java 主后台 Mock API 已完成；DEV-003 前端联调工作台已完成；DEV-005 Python AI Service Mock 边界已完成；DEV-006 Node MCP 工具调用边界已完成。下一步进入真实 wnx-web / wnx-serve capability 盘点，或把 Python AI Service 的 Mock 图谱/RAG 替换为 Neo4j、pgvector 和真实文档解析任务。
+当前状态：DEV-001 已完成；DEV-002 已完成 V0.1 P0 数据库设计与 API 契约；Docker 基础设施已验证通过并关闭；DEV-004 Java 主后台 Mock API 已完成；DEV-003 前端联调工作台已完成；DEV-005 Python AI Service Mock 边界已完成；DEV-006 Node MCP 工具调用边界已完成。真实知识图谱构建与检索已单独拆分为专项任务包：`05_开发计划与Agent任务/21_真实知识图谱构建与检索任务包/`。下一步若要启动真实 KG 开发，应优先按该目录中的 KG-DB、KG-API、KG-BE、KG-AI、KG-FE、KG-QA 顺序派单。
 
 | 顺序 | 任务编号 | 任务名称 | 前置条件 | 输入文档 | 输出结果 | 完成定义 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -18,6 +18,7 @@
 | 6 | DEV-003 | 实现前端工作台骨架 | 后端 Mock API 可用 | 04D、09 | frontend | 已完成：Vue3 + Vite + TS + Element Plus 联调工作台，覆盖问答、结果、执行日志、知识录入、MCP 能力、路径反馈 |
 | 7 | DEV-007 | 实现审批与执行闭环 | 审批链路明确 | 04C、07B、09 | backend-java、frontend、mcp-server-node | 审批流、执行任务、审计链跑通 |
 | 8 | DEV-008 | 完成联调与验证 | 前后端与工具层可运行 | 全量文档与代码 | 06_测试与发布 | 完成关键用例联调、风险回归与发布准备 |
+| 9 | DEV-009 | 真实知识图谱构建与检索专项开发 | 07F 设计已完成，专项任务包已落盘 | 07F、21_真实知识图谱构建与检索任务包 | DB/API/Java/Python/前端/测试分阶段完成真实 KG 链路 | source -> block -> candidate -> review -> Neo4j/pgvector -> graph query -> diagnosis search 主链路通过 |
 
 ## 3. 任务明细
 
@@ -121,6 +122,18 @@
 - 需要更新的文档：06_测试与发布、状态总表、变更记录。
 - 完成定义：关键用例通过，风险项已验证或显式登记。
 - 风险点：真实数据环境差异、跨系统权限和网络访问问题。
+
+### 3.9 DEV-009
+
+- 任务名称：真实知识图谱构建与检索专项开发
+- 目标：将当前 Mock 图谱升级为真实关系图谱，覆盖结构化文本/非结构化文件解析、候选实体关系、复核、Neo4j draft/publish、pgvector 证据召回、管理检索和诊断检索。
+- 前置条件：07F 真实知识图谱设计已完成；专项任务包已落盘。
+- 依赖模块：PostgreSQL、pgvector、Neo4j、Python AI Service、Java Backend、Vue3 管理端。
+- 输入文档：`03_技术方案与架构/07F_真实知识图谱构建与检索详细设计.md`、`05_开发计划与Agent任务/21_真实知识图谱构建与检索任务包/`。
+- 输出代码位置：backend-java、ai-service-python、frontend、infra/postgres、04_数据库与API、06_测试与发布。
+- 需要更新的文档：状态总表、变更记录、风险清单、API 文档、数据库设计、测试报告。
+- 完成定义：KG-DB、KG-API、KG-BE、KG-AI、KG-FE、KG-QA 主链路任务完成，结构化文本和非结构化文件均可形成真实 Neo4j 图谱并可被关系检索。
+- 风险点：LLM/embedding/OCR 供应商未最终确定，真实 wnx 数据字段清单未提供，初期图谱质量需要复核门禁。
 
 ## 4. 回写要求
 
