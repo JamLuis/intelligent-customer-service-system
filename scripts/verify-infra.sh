@@ -50,6 +50,13 @@ log "checking PostgreSQL extensions and P0 tables"
 compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT extname FROM pg_extension WHERE extname IN ('pgcrypto','vector') ORDER BY extname;"
 compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('support_session','diagnostic_case','execution_trace','execution_trace_step','mcp_call_log','knowledge_source','knowledge_ingestion_task','graph_build_batch','graph_asset','graph_revision','mcp_capability','mcp_capability_status_log','route_template','route_evaluation','audit_log');"
 
+log "checking real KG schema, taxonomy seed, and pgvector index"
+compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('graph_category','graph_entity_type','graph_relation_type','knowledge_block','graph_candidate_entity','graph_candidate_relation','graph_review_task','graph_query_log');"
+compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM graph_category WHERE status='enabled';"
+compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM graph_entity_type WHERE status='enabled';"
+compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM graph_relation_type WHERE status='enabled';"
+compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='knowledge_block' AND indexname='idx_knowledge_block_embedding_hnsw';"
+
 log "checking Neo4j"
 compose exec -T neo4j cypher-shell -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" "RETURN 1 AS ok;"
 

@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS graph_asset (
   CONSTRAINT ck_graph_asset_counts CHECK (node_count >= 0 AND edge_count >= 0)
 );
 
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS graph_category_id varchar(64);
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS graph_category_name varchar(128);
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS entity_types jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS relation_types jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS classification_path jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE graph_asset ADD COLUMN IF NOT EXISTS active_revision_id uuid;
+
 CREATE INDEX IF NOT EXISTS idx_graph_project_status ON graph_asset (tenant_id, project_id, status, updated_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_graph_category_status ON graph_asset (tenant_id, project_id, graph_category_id, status, updated_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_graph_batch ON graph_asset (batch_id) WHERE deleted_at IS NULL;

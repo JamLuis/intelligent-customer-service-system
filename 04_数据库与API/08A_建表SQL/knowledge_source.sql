@@ -32,6 +32,11 @@ CREATE TABLE IF NOT EXISTS knowledge_source (
   CONSTRAINT ck_knowledge_source_graph_build CHECK (graph_build_status IN ('pending','running','success','failed'))
 );
 
+ALTER TABLE knowledge_source ADD COLUMN IF NOT EXISTS graph_category_id varchar(64);
+ALTER TABLE knowledge_source ADD COLUMN IF NOT EXISTS graph_category_name varchar(128);
+ALTER TABLE knowledge_source ADD COLUMN IF NOT EXISTS object_key varchar(512);
+ALTER TABLE knowledge_source ADD COLUMN IF NOT EXISTS raw_text text;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uk_knowledge_source_hash ON knowledge_source (tenant_id, project_id, source_hash) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_source_project_status ON knowledge_source (tenant_id, project_id, status, updated_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_source_graph_category ON knowledge_source (tenant_id, project_id, graph_category_id, updated_at DESC) WHERE deleted_at IS NULL;

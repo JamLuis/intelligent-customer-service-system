@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS source_registry (
 \i /schema/08A/graph_build_batch.sql
 \i /schema/08A/graph_asset.sql
 \i /schema/08A/graph_revision.sql
+\i /schema/08A/real_kg_schema.sql
+\i /schema/08A/graph_taxonomy_seed.sql
 \i /schema/08A/mcp_capability_status_log.sql
 \i /schema/08A/route_template.sql
 \i /schema/08A/route_evaluation.sql
