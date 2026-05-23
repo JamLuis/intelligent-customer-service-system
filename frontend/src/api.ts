@@ -75,6 +75,9 @@ export const api = {
   queryGraphs() {
     return unwrap<Record<string, unknown>>(client.get('/v1/graphs/assets', { headers: headers() }));
   },
+  updateGraphDraft(graphId: string, body: Record<string, unknown>) {
+    return unwrap<Record<string, unknown>>(client.patch(`/v1/graphs/assets/${graphId}/draft`, body, { headers: headers(true) }));
+  },
   listCapabilities() {
     return unwrap<Record<string, unknown>>(client.get('/v1/mcp/capabilities', { headers: headers() }));
   },

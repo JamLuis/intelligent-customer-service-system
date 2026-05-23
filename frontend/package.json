@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-vue": "latest",
+    "@vue-flow/core": "^1.48.2",
     "axios": "latest",
     "element-plus": "latest",
     "lucide-vue-next": "latest",

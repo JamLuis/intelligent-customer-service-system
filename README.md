@@ -139,7 +139,7 @@ export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.x
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
 | `/chat` | 用户诊断 | 提供专家模式与引导式客服模式，只保留聊天、执行过程、可能结果和可信度 |
-| `/admin/knowledge` | 知识库与图谱 | 维护知识源、入图任务和图谱资产 |
+| `/admin/knowledge` | 知识库与图谱 | 支持结构化文本、非结构化文件录入，并通过关系图维护实体与关系 |
 | `/admin/tickets` | 问题工单 | 追溯用户问题、调用链和诊断结果 |
 | `/admin/mcp-tools` | MCP 工具库 | 查看 MCP 接口能力、启停状态、调用状态和影响范围 |
 
@@ -178,5 +178,5 @@ feat: initialize intelligent customer service system
 
 ## 当前阶段边界
 
-当前交付的是“项目初始化 + PM 初版 + 统一工程知识图谱架构框架 + 用户诊断界面 + 后台管理界面 + 可运行前后端与 AI/MCP Mock 边界”。
+当前交付的是“项目初始化 + PM 初版 + 统一工程知识图谱架构框架 + 用户诊断界面 + 后台管理界面 + 可视化知识图谱维护 + 可运行前后端与 AI/MCP Mock 边界”。
 生产环境鉴权、审批流引擎、真实图数据库读写、向量检索、真实文档解析、跨源关联、业务系统真实接入仍需后续阶段继续落盘。
