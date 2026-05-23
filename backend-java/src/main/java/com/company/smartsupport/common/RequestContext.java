@@ -35,6 +35,25 @@ public class RequestContext {
         }
     }
 
+    public void requirePermission(String permission, String errorCode, String message) {
+        boolean allowed = request()
+                .map(req -> req.getHeader("X-Permissions"))
+                .filter(StringUtils::hasText)
+                .map(header -> java.util.Arrays.stream(header.split(","))
+                        .map(String::trim)
+                        .anyMatch(item -> item.equals(permission) || item.equals("*")))
+                .orElse(false);
+        if (!allowed) {
+            throw new SmartSupportException(errorCode, message);
+        }
+    }
+
+    public String actorId() {
+        return request().map(req -> req.getHeader("X-User-Id"))
+                .filter(StringUtils::hasText)
+                .orElse("system");
+    }
+
     private Optional<HttpServletRequest> request() {
         RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
         if (attributes instanceof ServletRequestAttributes servletRequestAttributes) {

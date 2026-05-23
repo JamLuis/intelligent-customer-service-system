@@ -25,8 +25,9 @@
 | --- | --- |
 | knowledge_source | uploaded、parsing、extracted、graph_ready、published、failed |
 | knowledge_ingestion_task | pending、running、success、failed、canceled |
-| graph_candidate_entity/relation | candidate、accepted、reviewing、rejected、conflict、merged |
+| graph_candidate_entity/relation | candidate、accepted、reviewing、rejected、conflict、merged、frozen |
 | graph_asset | draft、reviewing、published、deprecated、rolled_back |
+| graph node/relation | draft、reviewing、published、frozen、deprecated、rolled_back |
 | graph_review_task | pending、approved、rejected、merged、canceled |
 
 ## 4. 数据结构
@@ -61,6 +62,10 @@
   "rawText": "<原文>",
   "normalizedText": "<规范化后文本>",
   "contentHash": "sha256",
+  "parentBlockId": null,
+  "embeddingModel": "text-embedding-v4",
+  "embeddingVersion": "v1",
+  "embeddingDim": 1536,
   "metadata": {"parser": "docling"},
   "createdAt": "2026-05-23T10:00:00+08:00"
 }
@@ -80,6 +85,7 @@
   "uniqueKey": {"<keyField>": "<value>"},
   "properties": {"<prop>": "<value>"},
   "evidenceBlockIds": ["uuid"],
+  "evidence": [{"blockId": "uuid", "weight": 0.85, "sourceType": "paragraph"}],
   "confidence": 0.88,
   "extractor": "rule",
   "status": "candidate",
@@ -99,6 +105,7 @@
   "relationType": "<RELATION_A>",
   "properties": {"<prop>": "<value>"},
   "evidenceBlockIds": ["uuid"],
+  "evidenceRefs": [{"blockId": "uuid", "weight": 1.0, "sourceType": "table_cell"}],
   "confidence": 0.84,
   "extractor": "llm",
   "status": "reviewing",
@@ -132,7 +139,7 @@
       "target": "<EntityTypeB>:<entityId>",
       "relationType": "<RELATION_A>",
       "sourceRefs": ["sourceId"],
-      "evidenceRefs": ["blockId"],
+      "evidenceRefs": [{"blockId": "blockId", "weight": 0.85, "sourceType": "paragraph"}],
       "confidence": 0.91,
       "status": "published",
       "revisionId": "uuid",
@@ -167,6 +174,8 @@
 | KG-019 | POST/PUT/DELETE | `/api/v1/graphs/taxonomy/entity-types[/{entityType}]` | graph:admin | 租户注册/更新/禁用实体类型（平台保护类型只读） |
 | KG-020 | POST/PUT/DELETE | `/api/v1/graphs/taxonomy/relation-types[/{relationType}]` | graph:admin | 租户注册/更新/禁用关系类型（平台保护关系只读） |
 | KG-021 | POST | `/api/v1/graphs/taxonomy/import` | graph:admin | 批量导入本体包（JSON），默认 dry-run 预览 |
+| KG-022 | POST | `/api/v1/graphs/entities/{entityId}/actions` | graph:freeze / graph:unfreeze | 冻结/解冻已发布实体 |
+| KG-023 | POST | `/api/v1/graphs/relations/{relationId}/actions` | graph:freeze / graph:unfreeze | 冻结/解冻已发布关系 |
 
 ## 6. API 详情
 
@@ -352,7 +361,18 @@
     "timeRange": {"start": "2026-05-22T00:00:00+08:00", "end": "2026-05-23T00:00:00+08:00"}
   },
   "graphCategoryIds": ["<category-id>"],
-  "maxDepth": 3
+  "maxDepth": 3,
+  "keywords": ["<keyword>"],
+  "embeddingModel": "text-embedding-v4",
+  "embeddingVersion": "v1",
+  "queryVector": [0.01, 0.02],
+  "traversalBudget": {
+    "maxNodes": 300,
+    "maxEdges": 800,
+    "maxDepthHardCap": 5,
+    "maxFanOutPerNode": 80,
+    "timeoutMs": 1500
+  }
 }
 ```
 
@@ -364,6 +384,20 @@
   "graphPaths": [],
   "sourceEvidence": [],
   "vectorEvidence": [],
+  "embeddingModel": "text-embedding-v4",
+  "embeddingVersion": "v1",
+  "budgetUsage": {
+    "visitedNodes": 0,
+    "visitedEdges": 0,
+    "truncated": false,
+    "appliedBudget": {
+      "maxNodes": 300,
+      "maxEdges": 800,
+      "maxDepthHardCap": 5,
+      "maxFanOutPerNode": 80,
+      "timeoutMs": 1500
+    }
+  },
   "suggestedMcpCapabilities": [],
   "confidence": 0.86,
   "degraded": false,
@@ -371,7 +405,7 @@
 }
 ```
 
-错误码：`ICSS-KG-400-INVALID_SEARCH`、`ICSS-KG-500-VECTOR_QUERY_FAILED`、`ICSS-SYS-503-DOWNSTREAM_UNAVAILABLE`。
+错误码：`ICSS-KG-400-INVALID_SEARCH`、`ICSS-KG-413-BUDGET_EXCEEDED`、`ICSS-KG-422-EMBEDDING_VERSION_MISMATCH`、`ICSS-KG-500-VECTOR_QUERY_FAILED`、`ICSS-SYS-503-DOWNSTREAM_UNAVAILABLE`。
 
 ### KG-011 getGraphNeighbors
 
@@ -465,6 +499,31 @@
 - Body：`{ "dryRun": true, "entityTypes":[...], "relationTypes":[...], "categories":[...] }`；默认 `dryRun=true`。
 - 幂等：必填 `X-Idempotency-Key`。
 - 响应：`{ inserted, updated, skipped, errors[] }`；存在错误且非 dryRun 时事务回滚。
+
+### KG-022 freezeOrUnfreezeEntity
+
+- 方法：POST；路径：`/api/v1/graphs/entities/{entityId}/actions`。
+- 权限：`action=freeze` 需要 `graph:freeze`；`action=unfreeze` 需要 `graph:unfreeze`。
+- 状态机：`freeze` 仅允许 `published -> frozen`；`unfreeze` 仅允许 `frozen -> published`。
+- 幂等：必填 `X-Idempotency-Key`。
+
+请求 Body：
+
+```json
+{
+  "action": "freeze",
+  "reason": "复核期间锁定"
+}
+```
+
+成功响应 data：`objectType`、`objectId`、`action`、`previousStatus`、`currentStatus`、`reason`、`operatedAt`。
+
+错误码：`ICSS-KG-403-FREEZE_FORBIDDEN`、`ICSS-KG-404-GRAPH_NOT_FOUND`、`ICSS-KG-409-FROZEN_NODE`、`ICSS-KG-500-NEO4J_WRITE_FAILED`。
+
+### KG-023 freezeOrUnfreezeRelation
+
+- 方法：POST；路径：`/api/v1/graphs/relations/{relationId}/actions`。
+- 权限、状态机、请求/响应、错误码同 KG-022。
 
 ## 7. Mock 场景（占位本体表述）
 

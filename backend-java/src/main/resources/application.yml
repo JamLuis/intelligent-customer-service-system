@@ -19,3 +19,22 @@ management:
 smart-support:
   ai-service-base-url: ${AI_SERVICE_BASE_URL:http://localhost:8100}
   mcp-server-base-url: ${MCP_SERVER_BASE_URL:http://localhost:3202}
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    username: ${NEO4J_USER:neo4j}
+    password: ${NEO4J_PASSWORD:smart_support}
+    database: ${NEO4J_DATABASE:neo4j}
+  graph:
+    traversal-budget:
+      max-nodes: ${GRAPH_TRAVERSAL_MAX_NODES:300}
+      max-edges: ${GRAPH_TRAVERSAL_MAX_EDGES:800}
+      max-depth-hard-cap: ${GRAPH_TRAVERSAL_MAX_DEPTH_HARD_CAP:5}
+      max-fan-out-per-node: ${GRAPH_TRAVERSAL_MAX_FAN_OUT_PER_NODE:80}
+      timeout-ms: ${GRAPH_TRAVERSAL_TIMEOUT_MS:1500}
+    search:
+      hybrid:
+        weights:
+          vector: ${GRAPH_SEARCH_WEIGHT_VECTOR:0.45}
+          bm25: ${GRAPH_SEARCH_WEIGHT_BM25:0.35}
+          graph: ${GRAPH_SEARCH_WEIGHT_GRAPH:0.20}
+          recency: ${GRAPH_SEARCH_WEIGHT_RECENCY:0.05}

@@ -34,7 +34,7 @@
 | API-018 | updateRouteTemplate | PATCH | `/api/v1/routes/{routeId}/status` | `route:publish` / `route:disable` | P0 |
 | API-019 | submitAnswerFeedback | POST | `/api/v1/routes/evaluations` | `route:feedback` | P0 |
 
-真实知识图谱 V0.2 增量接口 `KG-001` ~ `KG-015` 已单独收敛到 `09J_真实知识图谱API补充契约.md`，后续后端和前端实现应优先引用 09J，不得继续按 Mock JSON 图谱扩展接口。
+真实知识图谱 V0.2/V0.3.1 增量接口 `KG-001` ~ `KG-023` 已单独收敛到 `09J_真实知识图谱API补充契约.md`，后续后端和前端实现应优先引用 09J，不得继续按 Mock JSON 图谱扩展接口；其中 V0.3.1 新增 KG-022/KG-023 冻结/解冻、KG-010 `traversalBudget/budgetUsage`、Hybrid Retrieval 的 `embeddingModel/embeddingVersion/hybridScore`、统一加权 `evidenceRefs`。
 
 ## 3. 通用要求
 

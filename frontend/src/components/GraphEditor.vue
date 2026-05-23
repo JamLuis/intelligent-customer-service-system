@@ -6,16 +6,30 @@ import '@vue-flow/core/dist/theme-default.css';
 
 interface GraphNodePayload {
   id?: string;
+  entityId?: string;
   label?: string;
   type?: string;
+  entityType?: string;
+  status?: string;
+  evidenceRefs?: EvidenceRef[];
 }
 
 interface GraphEdgePayload {
   id?: string;
+  relationId?: string;
   source?: string;
   target?: string;
   type?: string;
   label?: string;
+  relationType?: string;
+  status?: string;
+  evidenceRefs?: EvidenceRef[];
+}
+
+interface EvidenceRef {
+  blockId?: string;
+  weight?: number;
+  sourceType?: string;
 }
 
 interface GraphPayload {
@@ -42,6 +56,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [{ graphId: string; nodes: FlowNode[]; edges: FlowEdge[] }];
+  action: [{ objectType: 'entity' | 'relation'; objectId: string; action: 'freeze' | 'unfreeze' }];
 }>();
 
 const nodes = shallowRef<FlowNode[]>([]);
@@ -66,7 +81,7 @@ const sourceOptions = computed<{ id: string; label: string }[]>(() => {
 
 function normalizeNodes(graphNodes: GraphNodePayload[] = []): FlowNode[] {
   return graphNodes.map((item, index) => ({
-    id: String(item.id || `entity:${index + 1}`),
+    id: String(item.entityId || item.id || `entity:${index + 1}`),
     type: 'default',
     position: {
       x: 80 + (index % 4) * 230,
@@ -74,7 +89,9 @@ function normalizeNodes(graphNodes: GraphNodePayload[] = []): FlowNode[] {
     },
     data: {
       label: item.label || item.id || `实体 ${index + 1}`,
-      entityType: item.type || 'entity'
+      entityType: item.entityType || item.type || 'entity',
+      status: item.status || 'published',
+      evidenceRefs: item.evidenceRefs || []
     }
   }));
 }
@@ -83,18 +100,26 @@ function normalizeEdges(graphEdges: GraphEdgePayload[] = []): FlowEdge[] {
   return graphEdges
     .filter((item) => item.source && item.target)
     .map((item, index) => {
-      const edgeType = item.type || item.label || 'RELATED_TO';
+      const edgeType = item.relationType || item.type || item.label || 'RELATED_TO';
       return {
-        id: String(item.id || `${item.source}-${edgeType}-${item.target}-${index}`),
+        id: String(item.relationId || item.id || `${item.source}-${edgeType}-${item.target}-${index}`),
         source: String(item.source),
         target: String(item.target),
         label: edgeType,
         type: 'default',
         animated: false,
-        data: { relationType: edgeType }
+        data: { relationType: edgeType, status: item.status || 'published', evidenceRefs: item.evidenceRefs || [] }
       };
     });
 }
+
+const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value) || null);
+const selectedEdge = computed(() => edges.value.find((edge) => edge.id === selectedEdgeId.value) || null);
+const selectedObjectStatus = computed(() => String(selectedNode.value?.data?.status || selectedEdge.value?.data?.status || ''));
+const selectedObjectEvidence = computed<EvidenceRef[]>(() => {
+  const evidence = selectedNode.value?.data?.evidenceRefs || selectedEdge.value?.data?.evidenceRefs || [];
+  return Array.isArray(evidence) ? evidence : [];
+});
 
 function edgeId(source: string, target: string, type: string) {
   return `${source}-${type}-${target}-${Date.now()}`;
@@ -152,7 +177,7 @@ function addEntity() {
 }
 
 function deleteSelectedEntity() {
-  if (!selectedNodeId.value) {
+  if (!selectedNodeId.value || selectedObjectStatus.value === 'frozen') {
     return;
   }
   const id = selectedNodeId.value;
@@ -180,7 +205,7 @@ function addRelation() {
 }
 
 function deleteSelectedRelation() {
-  if (!selectedEdgeId.value) {
+  if (!selectedEdgeId.value || selectedObjectStatus.value === 'frozen') {
     return;
   }
   edges.value = edges.value.filter((edge) => edge.id !== selectedEdgeId.value);
@@ -189,6 +214,14 @@ function deleteSelectedRelation() {
 
 function saveDraft() {
   emit('save', { graphId: graphId.value, nodes: nodes.value, edges: edges.value });
+}
+
+function applySelectedAction(action: 'freeze' | 'unfreeze') {
+  if (selectedNode.value) {
+    emit('action', { objectType: 'entity', objectId: String(selectedNode.value.id), action });
+  } else if (selectedEdge.value) {
+    emit('action', { objectType: 'relation', objectId: String(selectedEdge.value.id), action });
+  }
 }
 
 watch(
@@ -212,8 +245,10 @@ watch(
         <span>{{ graph?.graphCategoryName || '未分类图谱' }} · {{ nodes.length }} 个实体 / {{ edges.length }} 条关系</span>
       </div>
       <div class="graph-actions">
-        <el-button @click="deleteSelectedEntity" :disabled="!selectedNodeId">删除实体</el-button>
-        <el-button @click="deleteSelectedRelation" :disabled="!selectedEdgeId">删除关系</el-button>
+        <el-button @click="applySelectedAction('freeze')" :disabled="!(selectedNode || selectedEdge) || selectedObjectStatus === 'frozen'">冻结</el-button>
+        <el-button @click="applySelectedAction('unfreeze')" :disabled="!(selectedNode || selectedEdge) || selectedObjectStatus !== 'frozen'">解冻</el-button>
+        <el-button @click="deleteSelectedEntity" :disabled="!selectedNodeId || selectedObjectStatus === 'frozen'">删除实体</el-button>
+        <el-button @click="deleteSelectedRelation" :disabled="!selectedEdgeId || selectedObjectStatus === 'frozen'">删除关系</el-button>
         <el-button type="primary" @click="saveDraft">保存草稿</el-button>
       </div>
     </div>
@@ -250,6 +285,18 @@ watch(
             <el-option v-for="item in sourceOptions" :key="item.id" :label="item.label" :value="item.id" />
           </el-select>
           <el-button type="primary" plain @click="addRelation">建立关系</el-button>
+        </div>
+
+        <div v-if="selectedNode || selectedEdge" class="side-section">
+          <strong>选中对象</strong>
+          <el-tag :type="selectedObjectStatus === 'frozen' ? 'warning' : 'success'" effect="plain">
+            {{ selectedObjectStatus === 'frozen' ? 'Frozen' : selectedObjectStatus || 'published' }}
+          </el-tag>
+          <div v-if="selectedObjectEvidence.length" class="evidence-tag-list">
+            <el-tag v-for="item in selectedObjectEvidence" :key="`${item.blockId}-${item.sourceType}`" size="small" effect="plain">
+              {{ item.sourceType || 'paragraph' }} · {{ Math.round(Number(item.weight || 0) * 100) }}%
+            </el-tag>
+          </div>
         </div>
       </aside>
     </div>

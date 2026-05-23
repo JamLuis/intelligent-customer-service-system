@@ -52,8 +52,17 @@ public class GlobalExceptionHandler {
         if (code.contains("-413-")) {
             return HttpStatus.PAYLOAD_TOO_LARGE;
         }
+        if (code.contains("-422-")) {
+            return HttpStatus.UNPROCESSABLE_ENTITY;
+        }
         if (code.contains("-429-")) {
             return HttpStatus.TOO_MANY_REQUESTS;
+        }
+        if (code.contains("-500-")) {
+            return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        if (code.contains("-502-")) {
+            return HttpStatus.BAD_GATEWAY;
         }
         if (code.contains("-503-")) {
             return HttpStatus.SERVICE_UNAVAILABLE;

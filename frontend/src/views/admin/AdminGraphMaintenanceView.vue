@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Filter, GitBranch, Network } from 'lucide-vue-next';
 import { api, setRuntimeConfig, type RuntimeConfig } from '../../api';
+import BudgetBanner from '../../components/BudgetBanner.vue';
 import GraphEditor from '../../components/GraphEditor.vue';
 import JsonBlock from '../../components/JsonBlock.vue';
 
@@ -64,6 +65,26 @@ async function saveGraphDraft(payload: { graphId: string; nodes: unknown[]; edge
       edges: payload.edges
     });
     ElMessage.success('历史图谱草稿已保存');
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function applyGraphObjectAction(payload: { objectType: 'entity' | 'relation'; objectId: string; action: 'freeze' | 'unfreeze' }) {
+  loading.value = true;
+  syncRuntime();
+  try {
+    const body = { action: payload.action, reason: 'graph maintenance action' };
+    draftResult.value = payload.objectType === 'entity'
+      ? await api.applyEntityAction(payload.objectId, body)
+      : await api.applyRelationAction(payload.objectId, body);
+    ElMessage.success(payload.action === 'freeze' ? '已冻结图谱对象' : '已解冻图谱对象');
+    await loadGraphs();
+  } catch (e: any) {
+    if (String(e?.response?.data?.code || '').includes('EMBEDDING_VERSION_MISMATCH')) {
+      ElMessage.warning('Embedding 版本不匹配，请先重建向量索引');
+    }
+    throw e;
   } finally {
     loading.value = false;
   }
@@ -138,7 +159,14 @@ onMounted(async () => {
           <strong>{{ activeGraph.sourceRefs?.length || 0 }} 个</strong>
         </div>
       </div>
-      <GraphEditor :graph="activeGraph" :entity-types="entityTypes" :relation-types="relationTypes" @save="saveGraphDraft" />
+      <BudgetBanner :budget-usage="activeGraph?.budgetUsage" :hybrid-scores="activeGraph?.vectorEvidence || activeGraph?.sourceEvidence" />
+      <GraphEditor
+        :graph="activeGraph"
+        :entity-types="entityTypes"
+        :relation-types="relationTypes"
+        @save="saveGraphDraft"
+        @action="applyGraphObjectAction"
+      />
       <JsonBlock :value="draftResult" />
     </el-card>
 

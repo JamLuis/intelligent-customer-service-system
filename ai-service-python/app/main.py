@@ -3,6 +3,9 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from app.clients.llm_client import LLMClientError, get_llm_client
+from app.extractors.canonical_resolver import CanonicalSignals, score_breakdown
+from app.extractors.evidence import build_evidence
+from app.retrieval.graph_retrieval_planner import build_retrieve_plan
 from app.settings import get_settings
 
 app = FastAPI(title="Smart Support AI Service", version="0.1.0")
@@ -129,28 +132,81 @@ def embed_blocks(request: dict[str, Any]) -> dict[str, Any]:
 def extract_candidates(request: dict[str, Any]) -> dict[str, Any]:
     """Rule + Dict + LLM 抽取真实实现见 KG-AI-003。
     入参必须携带 blocks + taxonomy + graphCategoryId，本接口禁止凭空生成名称。"""
+    blocks = request.get("blocks") or []
+    candidate_entities = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        text = (block.get("normalizedText") or block.get("rawText") or block.get("text") or "").strip()
+        if not text:
+            continue
+        evidence = build_evidence(block)
+        if not evidence["blockId"]:
+            continue
+        # KG-AI-003 的 LLM 抽取仍待细化；这里先输出可保存的 weighted evidence 空候选骨架。
+        candidate_entities.append({
+            "candidateId": None,
+            "blockId": evidence["blockId"],
+            "graphCategoryId": request.get("graphCategoryId"),
+            "entityType": None,
+            "rawName": None,
+            "canonicalName": None,
+            "uniqueKey": {},
+            "properties": {},
+            "evidence": [evidence],
+            "evidenceBlockIds": [evidence["blockId"]],
+            "confidence": 0.0,
+            "extractor": "pending_llm",
+            "status": "candidate",
+        })
     return {
-        "candidateEntities": [],
+        "candidateEntities": candidate_entities,
         "candidateRelations": [],
-        "implHint": "KG-AI-003 待实现",
+        "implHint": "KG-AI-003 LLM 抽取待实现；KG-AI-006 weighted evidence 已接入",
     }
 
 
 @app.post("/knowledge/normalize")
 def normalize_candidates(request: dict[str, Any]) -> dict[str, Any]:
     """别名归一 / Cross link / Conflict detection 真实实现见 KG-AI-003。"""
+    frozen_ids = {str(x) for x in (request.get("frozenCandidateIds") or [])}
+    candidates = request.get("candidates") or []
+    normalized = []
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        candidate_id = str(item.get("candidateId") or "")
+        if candidate_id and candidate_id in frozen_ids:
+            normalized.append({**item, "skipped": True, "reason": "frozen"})
+            continue
+        signals = item.get("signals") or {}
+        breakdown = score_breakdown(CanonicalSignals(
+            unique_key=bool(signals.get("uniqueKey")),
+            alias=bool(signals.get("alias")),
+            regex=bool(signals.get("regex")),
+            embedding=float(signals.get("embedding") or 0),
+            code_graph_ref=bool(signals.get("codeGraphRef")),
+            llm_verify=bool(signals.get("llmVerify")),
+        ))
+        normalized.append({**item, "scoreBreakdown": breakdown, "crossLinkHint": breakdown["crossLinkHint"]})
     return {
-        "normalized": {"entities": [], "relations": []},
+        "normalized": {"entities": normalized, "relations": []},
         "conflicts": [],
-        "implHint": "KG-AI-003 待实现",
+        "implHint": "KG-AI-007 scoreBreakdown/frozen skip 已接入；完整归一策略待 Java 表决链联调",
     }
 
 
 @app.post("/graphs/retrieve-plan")
 def retrieve_plan(request: dict[str, Any]) -> dict[str, Any]:
     """检索规划真实实现见 KG-AI-004。"""
+    s = get_settings()
+    plan = build_retrieve_plan(
+        str(request.get("questionText") or ""),
+        request.get("keywords") if isinstance(request.get("keywords"), list) else None,
+    )
     return {
-        "plan": {"steps": []},
-        "vectorQueryText": str(request.get("questionText") or ""),
-        "implHint": "KG-AI-004 待实现",
+        **plan,
+        "embeddingModel": s.embedding_model,
+        "embeddingVersion": s.embedding_version,
+        "implHint": "KG-AI-004 planner 待细化；KG-AI-006 keywords/vectorQueryText fallback 已接入",
     }

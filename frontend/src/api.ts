@@ -30,7 +30,7 @@ function requestId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
-function headers(write = false) {
+function headers(write = false, permissions?: string[]) {
   const result: Record<string, string> = {
     Authorization: `Bearer ${runtimeConfig.token}`,
     'X-Project-Id': runtimeConfig.projectId,
@@ -38,6 +38,9 @@ function headers(write = false) {
   };
   if (write) {
     result['X-Idempotency-Key'] = requestId();
+  }
+  if (permissions?.length) {
+    result['X-Permissions'] = permissions.join(',');
   }
   return result;
 }
@@ -80,6 +83,21 @@ export const api = {
   },
   updateGraphDraft(graphId: string, body: Record<string, unknown>) {
     return unwrap<Record<string, unknown>>(client.patch(`/v1/graphs/assets/${graphId}/draft`, body, { headers: headers(true) }));
+  },
+  applyEntityAction(entityId: string, body: Record<string, unknown>) {
+    const action = String(body.action || '');
+    return unwrap<Record<string, unknown>>(client.post(`/v1/graphs/entities/${entityId}/actions`, body, {
+      headers: headers(true, [action === 'unfreeze' ? 'graph:unfreeze' : 'graph:freeze'])
+    }));
+  },
+  applyRelationAction(relationId: string, body: Record<string, unknown>) {
+    const action = String(body.action || '');
+    return unwrap<Record<string, unknown>>(client.post(`/v1/graphs/relations/${relationId}/actions`, body, {
+      headers: headers(true, [action === 'unfreeze' ? 'graph:unfreeze' : 'graph:freeze'])
+    }));
+  },
+  searchDiagnosisGraph(body: Record<string, unknown>) {
+    return unwrap<Record<string, unknown>>(client.post('/v1/graphs/search/diagnosis', body, { headers: headers() }));
   },
   listCapabilities() {
     return unwrap<Record<string, unknown>>(client.get('/v1/mcp/capabilities', { headers: headers() }));

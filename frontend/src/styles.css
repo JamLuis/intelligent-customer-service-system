@@ -379,6 +379,42 @@ body {
   margin-top: 4px;
 }
 
+.budget-banner {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hybrid-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hybrid-score-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d7e1e5;
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.hybrid-score-card span,
+.hybrid-score-card small {
+  overflow: hidden;
+  color: #687982;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hybrid-score-card strong {
+  color: #174f64;
+  font-size: 18px;
+}
+
 .taxonomy-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -473,6 +509,12 @@ body {
   font-size: 13px;
 }
 
+.evidence-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 pre {
   max-height: 260px;
   margin: 12px 0 0;
@@ -540,7 +582,8 @@ pre {
   .runtime-panel,
   .guided-form,
   .taxonomy-grid,
-  .graph-summary-strip {
+  .graph-summary-strip,
+  .hybrid-score-grid {
     grid-template-columns: 1fr;
   }
 
