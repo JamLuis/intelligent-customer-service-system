@@ -9,7 +9,7 @@
 - 项目级文档骨架与 PM 初版需求文档
 - 多阶段推进说明、风险清单、Agent 主任务书、中断恢复指南
 - 可继续开发的 monorepo 最小工程骨架
-- Java 主后台 Mock API、Vue3 前端联调工作台、Python AI Service Mock 边界、Node MCP 工具调用边界
+- Java 主后台 Mock API、Vue3 用户诊断与后台管理系统、Python AI Service Mock 边界、Node MCP 工具调用边界
 - 针对 wnx-web 与 wnx-serve 的集成目标说明
 - 统一工程知识图谱项目框架：[03_技术方案与架构/07E_统一工程知识图谱项目框架.md](03_技术方案与架构/07E_统一工程知识图谱项目框架.md)
 
@@ -21,7 +21,7 @@
 - 03_技术方案与架构：后续架构阶段产物
 - 04_数据库与API：后续 DB / API 阶段产物
 - 05_开发计划与Agent任务：任务拆分与执行顺序
-- frontend：Vue3 + Element Plus 前端正式边界，当前保留 README 与迁移说明
+- frontend：Vue3 + Element Plus 前端正式边界，包含用户诊断聊天入口与后台管理
 - backend-java：Java Spring Boot 主后台，承载 auth、user、project、device、diagnosis、ticket、approval、audit
 - ai-service-python：Python AI Service，承载 document_parser、entity_extractor、graph_builder、rag、diagnosis_agent
 - mcp-server-node：Node MCP 工具层，承载 device、alarm、config、log、statistics 工具
@@ -132,7 +132,16 @@ export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.x
 | Redis | `redis:7-alpine` | `6379` | 缓存、限流、短期状态 |
 
 容器配置在 [infra/docker-compose.yml](infra/docker-compose.yml)，初始化 SQL 在 [infra/postgres/init.sql](infra/postgres/init.sql)。
-当前 `frontend` 已生成 Vue3 + Vite + TypeScript 联调工作台；脚本会自动检测 `frontend/package.json`，存在时一并启动前端，默认端口 `5173`。
+当前 `frontend` 已生成 Vue3 + Vite + TypeScript 管理系统前端；脚本会自动检测 `frontend/package.json`，存在时一并启动前端，默认端口 `5173`。
+
+前端主要路由：
+
+| 路由 | 页面 | 说明 |
+| --- | --- | --- |
+| `/chat` | 用户诊断 | 提供专家模式与引导式客服模式，只保留聊天、执行过程、可能结果和可信度 |
+| `/admin/knowledge` | 知识库与图谱 | 维护知识源、入图任务和图谱资产 |
+| `/admin/tickets` | 问题工单 | 追溯用户问题、调用链和诊断结果 |
+| `/admin/mcp-tools` | MCP 工具库 | 查看 MCP 接口能力、启停状态、调用状态和影响范围 |
 
 ## 构建与验证
 
@@ -169,5 +178,5 @@ feat: initialize intelligent customer service system
 
 ## 当前阶段边界
 
-当前交付的是“项目初始化 + PM 初版 + 统一工程知识图谱架构框架 + 可运行前后端与 AI/MCP Mock 边界”。
+当前交付的是“项目初始化 + PM 初版 + 统一工程知识图谱架构框架 + 用户诊断界面 + 后台管理界面 + 可运行前后端与 AI/MCP Mock 边界”。
 生产环境鉴权、审批流引擎、真实图数据库读写、向量检索、真实文档解析、跨源关联、业务系统真实接入仍需后续阶段继续落盘。
