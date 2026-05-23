@@ -42,6 +42,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .coverage
+*.egg-info/
 
 # Docker / database local data
 infra/postgres/data/
