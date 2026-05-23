@@ -1,0 +1,16 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: smart-support-backend-java
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+smart-support:
+  ai-service-base-url: ${AI_SERVICE_BASE_URL:http://localhost:8100}
+  mcp-server-base-url: ${MCP_SERVER_BASE_URL:http://localhost:3202}

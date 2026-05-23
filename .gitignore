@@ -1,0 +1,53 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Environment and local runtime
+.env
+.env.*
+!.env.example
+.runtime/
+logs/
+*.log
+
+# Node / frontend / MCP server
+node_modules/
+frontend/node_modules/
+mcp-server-node/node_modules/
+dist/
+frontend/dist/
+mcp-server-node/dist/
+coverage/
+.npm/
+.pnpm-store/
+
+# Java / Maven
+target/
+backend-java/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Python
+.venv/
+venv/
+ai-service-python/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Docker / database local data
+infra/postgres/data/
+infra/neo4j/data/
+infra/neo4j/logs/
+infra/redis/data/
+
+# Local indexes and generated analysis
+.codegraph/

@@ -1,0 +1,20 @@
+[project]
+name = "smart-support-ai-service"
+version = "0.1.0"
+description = "Python AI service for document parsing, graph building, RAG, and diagnosis agents"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.0"
+]
+
+[project.optional-dependencies]
+ai = [
+  "langgraph>=0.2.0",
+  "neo4j>=5.20.0",
+  "psycopg[binary]>=3.2.0"
+]
+
+[tool.uvicorn]
+factory = false

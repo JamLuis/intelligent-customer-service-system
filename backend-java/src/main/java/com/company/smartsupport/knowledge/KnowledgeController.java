@@ -1,0 +1,66 @@
+package com.company.smartsupport.knowledge;
+
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.company.smartsupport.common.ApiResponse;
+import com.company.smartsupport.common.PageResult;
+import com.company.smartsupport.common.RequestContext;
+import com.company.smartsupport.mock.MockSupportService;
+
+@RestController
+@RequestMapping("/api/v1/knowledge")
+public class KnowledgeController {
+
+    private final MockSupportService mockSupportService;
+    private final RequestContext requestContext;
+
+    public KnowledgeController(MockSupportService mockSupportService, RequestContext requestContext) {
+        this.mockSupportService = mockSupportService;
+        this.requestContext = requestContext;
+    }
+
+    @PostMapping("/sources")
+    public ApiResponse<Map<String, Object>> createKnowledgeSource(@RequestBody Map<String, Object> body) {
+        requestContext.requireIdempotencyKey();
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.createKnowledgeSource(body, projectId));
+    }
+
+    @GetMapping("/sources")
+    public ApiResponse<PageResult<Map<String, Object>>> listKnowledgeSources(
+            @RequestParam(defaultValue = "1") int pageNo,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.listKnowledgeSources(pageNo, pageSize));
+    }
+
+    @GetMapping("/sources/{sourceId}/tasks")
+    public ApiResponse<PageResult<Map<String, Object>>> tasks(@PathVariable String sourceId,
+            @RequestParam(defaultValue = "1") int pageNo,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.ingestionTasks(sourceId, pageNo, pageSize));
+    }
+
+    @PostMapping("/sources/{sourceId}/retry")
+    public ApiResponse<Map<String, Object>> retry(@PathVariable String sourceId) {
+        requestContext.requireIdempotencyKey();
+        requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.retryKnowledgeSource(sourceId));
+    }
+
+    @PostMapping("/cases")
+    public ApiResponse<Map<String, Object>> publishKnowledgeCase(@RequestBody Map<String, Object> body) {
+        requestContext.requireIdempotencyKey();
+        requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.placeholder("deferred", "V0.1 使用知识源入图替代知识案例发布"));
+    }
+}

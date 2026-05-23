@@ -1,0 +1,19 @@
+{
+  "name": "intelligent-customer-service-system",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "mcp-server-node"
+  ],
+  "scripts": {
+    "start:all": "./scripts/start-all.sh start",
+    "stop:all": "./scripts/start-all.sh stop",
+    "status:all": "./scripts/start-all.sh status",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build:frontend": "npm run build --workspace frontend",
+    "dev:mcp-node": "npm run dev --workspace smart-support-mcp-server-node",
+    "build:mcp-node": "npm run build --workspace smart-support-mcp-server-node",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}
