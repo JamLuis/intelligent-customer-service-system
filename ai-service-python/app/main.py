@@ -1,8 +1,33 @@
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+
+from app.clients.llm_client import LLMClientError, get_llm_client
+from app.settings import get_settings
 
 app = FastAPI(title="Smart Support AI Service", version="0.1.0")
+
+
+@app.get("/llm/ping")
+def llm_ping() -> dict[str, Any]:
+    """Smoke test: hit chat + embeddings with current LLM_* env."""
+    s = get_settings()
+    try:
+        client = get_llm_client()
+        reply = client.chat(
+            [{"role": "user", "content": "ping"}], max_tokens=8, temperature=0
+        )
+        vecs = client.embeddings(["ping"])
+    except LLMClientError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    return {
+        "provider": s.llm_provider,
+        "llmModel": s.llm_model,
+        "chatReply": reply[:64],
+        "embeddingModel": s.embedding_model,
+        "embeddingDim": len(vecs[0]) if vecs else 0,
+        "embeddingVersion": s.embedding_version,
+    }
 
 # 本服务为无状态计算服务：
 #   - 解析、抽取、归一化、检索规划等真实逻辑见任务 KG-AI-001 ~ KG-AI-005
@@ -56,10 +81,47 @@ def parse_knowledge(request: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/knowledge/embed")
 def embed_blocks(request: dict[str, Any]) -> dict[str, Any]:
-    """Embedding 真实实现见 KG-AI-002。当前返回空向量。"""
+    """KG-AI-002 MVP: 调用 OpenAI 兼容 embeddings 端点，返回 (blockId, vector) 列表。
+
+    入参:
+      { "blocks": [ {"blockId": "...", "text": "..."}, ... ] }
+    出参:
+      { "embeddings": [ {"blockId": "...", "vector": [...]} ],
+        "embeddingModel": str, "embeddingVersion": str, "embeddingDim": int }
+    维度受 EMBEDDING_DIM 约束（默认 1536，对齐 KG-DB-001 pgvector schema）。
+    """
+    blocks = request.get("blocks") or []
+    if not isinstance(blocks, list):
+        raise HTTPException(status_code=422, detail="blocks must be an array")
+    texts: list[str] = []
+    block_ids: list[str] = []
+    for i, b in enumerate(blocks):
+        if not isinstance(b, dict):
+            raise HTTPException(status_code=422, detail=f"blocks[{i}] must be object")
+        text = (b.get("text") or "").strip()
+        if not text:
+            raise HTTPException(status_code=422, detail=f"blocks[{i}].text is empty")
+        texts.append(text)
+        block_ids.append(str(b.get("blockId") or i))
+    s = get_settings()
+    if not texts:
+        return {
+            "embeddings": [],
+            "embeddingModel": s.embedding_model,
+            "embeddingVersion": s.embedding_version,
+            "embeddingDim": s.embedding_dim,
+        }
+    try:
+        vectors = get_llm_client().embeddings(texts)
+    except LLMClientError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
     return {
-        "embeddings": [],
-        "implHint": "KG-AI-002 待实现",
+        "embeddings": [
+            {"blockId": bid, "vector": vec} for bid, vec in zip(block_ids, vectors)
+        ],
+        "embeddingModel": s.embedding_model,
+        "embeddingVersion": s.embedding_version,
+        "embeddingDim": s.embedding_dim,
     }
 
 

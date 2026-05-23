@@ -52,3 +52,6 @@ infra/redis/data/
 
 # Local indexes and generated analysis
 .codegraph/
+
+# Sensitive information
+ai-key
