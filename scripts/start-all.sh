@@ -13,6 +13,7 @@ FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
 MAVEN_SETTINGS="${MAVEN_SETTINGS:-$ROOT_DIR/../app-ship-alarm/settings.xml}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$ROOT_DIR/.env}"
+BACKEND_JAR="$ROOT_DIR/backend-java/target/backend-java-0.1.0-SNAPSHOT.jar"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -110,6 +111,17 @@ stop_process() {
   rm -f "$file"
 }
 
+stop_port_process() {
+  local name="$1"
+  local port="$2"
+  local pids
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -n "$pids" ]]; then
+    log "stopping $name listeners on port $port: $pids"
+    kill $pids >/dev/null 2>&1 || true
+  fi
+}
+
 install_node_dependencies() {
   require_command npm
   local node_dir
@@ -186,12 +198,15 @@ start_all() {
   local node_dir
   node_dir="$(node_bin_dir)"
 
-  start_process "mcp-server-node" "$(with_node_path "$node_dir" "PORT=$MCP_PORT npm run dev:mcp-node")"
-  start_process "ai-service-python" "cd ai-service-python && .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $AI_PORT"
-  start_process "backend-java" "export JAVA_HOME='$jdk_home'; export PATH=\"\$JAVA_HOME/bin:\$PATH\"; BACKEND_PORT=$BACKEND_PORT AI_SERVICE_BASE_URL=http://localhost:$AI_PORT MCP_SERVER_BASE_URL=http://localhost:$MCP_PORT mvn $maven_settings_arg -f backend-java/pom.xml spring-boot:run"
+  log "packaging Java backend"
+  (cd "$ROOT_DIR" && export JAVA_HOME="$jdk_home" && export PATH="$JAVA_HOME/bin:$PATH" && bash -lc "mvn $maven_settings_arg -q -f backend-java/pom.xml -DskipTests package")
+
+  start_process "mcp-server-node" "$(with_node_path "$node_dir" "PORT=$MCP_PORT exec npm run dev:mcp-node")"
+  start_process "ai-service-python" "exec ai-service-python/.venv/bin/python -m uvicorn app.main:app --app-dir ai-service-python --host 0.0.0.0 --port $AI_PORT"
+  start_process "backend-java" "export JAVA_HOME='$jdk_home'; export PATH="\$JAVA_HOME/bin:\$PATH"; BACKEND_PORT=$BACKEND_PORT AI_SERVICE_BASE_URL=http://localhost:$AI_PORT MCP_SERVER_BASE_URL=http://localhost:$MCP_PORT exec java -jar '$BACKEND_JAR'"
 
   if [[ -f "$ROOT_DIR/frontend/package.json" ]]; then
-    start_process "frontend" "$(with_node_path "$node_dir" "cd frontend && npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT")"
+    start_process "frontend" "$(with_node_path "$node_dir" "exec npm --prefix frontend run dev -- --host 0.0.0.0 --port $FRONTEND_PORT")"
   else
     log "frontend/package.json not found, skip frontend"
   fi
@@ -208,6 +223,10 @@ stop_all() {
   stop_process "backend-java"
   stop_process "ai-service-python"
   stop_process "mcp-server-node"
+  stop_port_process "frontend" "$FRONTEND_PORT"
+  stop_port_process "backend-java" "$BACKEND_PORT"
+  stop_port_process "ai-service-python" "$AI_PORT"
+  stop_port_process "mcp-server-node" "$MCP_PORT"
   stop_infra
 }
 
