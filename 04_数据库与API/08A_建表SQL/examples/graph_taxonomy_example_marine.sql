@@ -1,4 +1,11 @@
--- Initial taxonomy seed for real engineering knowledge graph.
+-- 【示例】航运/设备/告警领域的本体配置示例
+-- 重要说明：
+--   1. 本文件仅供参考，不会被 infra/postgres/init.sql 自动加载。
+--   2. 本系统是通用知识图谱平台，不内置任何业务领域本体；
+--      下列 8 个分类、28 个实体类型、22 个关系类型仅为"某航运租户可能的配置"。
+--   3. 生产环境请通过 KG-ADMIN-* 管理 API 注册本租户的本体，而不要直接执行本 SQL。
+--   4. 若手工执行，写入的是 (tenant_id='default', project_id='*') 这一通用模板域，
+--      请按租户实际隔离需求自行修改。
 -- Re-runnable: all inserts use ON CONFLICT upsert semantics.
 
 INSERT INTO graph_entity_type (entity_type, label, description, unique_key_schema, property_schema, extractor_rules, sort_order)

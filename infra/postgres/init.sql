@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS source_registry (
 \i /schema/08A/graph_asset.sql
 \i /schema/08A/graph_revision.sql
 \i /schema/08A/real_kg_schema.sql
-\i /schema/08A/graph_taxonomy_seed.sql
+\i /schema/08A/graph_protected_taxonomy.sql
+-- 注意：业务领域本体（实体类型/关系类型/分类）必须由租户/项目通过 KG-ADMIN-* API 注册，
+-- 不再下发任何领域 seed。如需查看一个示例，可手工执行 /schema/08A/examples/graph_taxonomy_example_marine.sql。
 \i /schema/08A/mcp_capability_status_log.sql
 \i /schema/08A/route_template.sql
 \i /schema/08A/route_evaluation.sql

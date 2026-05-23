@@ -12,7 +12,7 @@
 ### 已完成
 
 1. 新增真实 KG schema 文件：`04_数据库与API/08A_建表SQL/real_kg_schema.sql`。
-2. 新增 taxonomy seed 文件：`04_数据库与API/08A_建表SQL/graph_taxonomy_seed.sql`。
+2. 平台保护类型 seed 文件：`04_数据库与API/08A_建表SQL/graph_protected_taxonomy.sql`（仅 SourceBlock/Document/Section + HAS_EVIDENCE/HAS_SECTION/IN_SECTION）。示例本体包位于同目录 `examples/`，**不被 init.sql 加载**，需时手工导入或调用 KG-021。
 3. 更新 `infra/postgres/init.sql`，将真实 KG schema 和 seed 纳入初始化。
 4. 更新 `scripts/verify-infra.sh`，增加真实 KG 表、taxonomy seed 和 pgvector 索引检查。
 5. 修复已有 Docker volume 中旧表不自动补列的问题：
@@ -31,8 +31,8 @@
 | 表名 | 用途 |
 | --- | --- |
 | graph_category | 图谱分类，如地区-船舶、船舶-设备、设备-告警 |
-| graph_entity_type | 实体类型本体，如 Device、Vessel、Protocol |
-| graph_relation_type | 关系类型本体，如 INSTALLED_ON、BOUND_TO、USES_PROTOCOL |
+| graph_entity_type | 实体类型本体；seed 仅含平台保护类型，业务类型由租户运行时通过 KG-019 注册 |
+| graph_relation_type | 关系类型本体；seed 仅含平台保护关系，业务关系由租户运行时通过 KG-020 注册 |
 | knowledge_block | 文件解析块，包含文本块、表格块、OCR 块和 pgvector embedding |
 | graph_candidate_entity | 候选实体 |
 | graph_candidate_relation | 候选关系 |

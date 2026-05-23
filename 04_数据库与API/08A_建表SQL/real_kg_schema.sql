@@ -8,9 +8,10 @@ ALTER TABLE knowledge_source DROP CONSTRAINT IF EXISTS ck_knowledge_source_type;
 ALTER TABLE knowledge_source
   ADD CONSTRAINT ck_knowledge_source_type CHECK (source_type IN ('doc','docx','xls','xlsx','pdf','jpg','jpeg','png','text','md','log','ini','json','csv'));
 
+-- batch_type 不再做枚举约束；由元数据/应用层校验。
 ALTER TABLE graph_build_batch DROP CONSTRAINT IF EXISTS ck_graph_build_batch_type;
 ALTER TABLE graph_build_batch
-  ADD CONSTRAINT ck_graph_build_batch_type CHECK (batch_type IN ('knowledge','code','api','db','log','case','mixed'));
+  ADD CONSTRAINT ck_graph_build_batch_type CHECK (batch_type ~ '^[A-Za-z][A-Za-z0-9_\-]{0,63}$');
 
 CREATE TABLE IF NOT EXISTS graph_category (
   category_uid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS graph_category (
   created_by varchar(64) NOT NULL DEFAULT 'system',
   updated_by varchar(64),
   CONSTRAINT uk_graph_category_scope UNIQUE (tenant_id, project_id, category_id),
-  CONSTRAINT ck_graph_category_domain CHECK (domain IN ('asset','people','event','integration','code','db','ops','case','geo','mixed')),
+  CONSTRAINT ck_graph_category_domain CHECK (domain ~ '^[A-Za-z][A-Za-z0-9_\-]{0,63}$'),
   CONSTRAINT ck_graph_category_status CHECK (status IN ('enabled','disabled')),
   CONSTRAINT ck_graph_category_scope_json CHECK (jsonb_typeof(entity_type_scope) = 'array' AND jsonb_typeof(relation_type_scope) = 'array')
 );
@@ -37,8 +38,9 @@ CREATE TABLE IF NOT EXISTS graph_category (
 CREATE INDEX IF NOT EXISTS idx_graph_category_project_status ON graph_category (tenant_id, project_id, status, sort_order, category_id);
 CREATE INDEX IF NOT EXISTS idx_graph_category_domain ON graph_category (tenant_id, project_id, domain, status, sort_order);
 
-COMMENT ON TABLE graph_category IS '真实知识图谱分类表：定义地区-船舶、船舶-设备、设备-告警等动态图谱分类';
-COMMENT ON COLUMN graph_category.project_id IS '项目级分类；全局默认分类使用 *';
+COMMENT ON TABLE graph_category IS '知识图谱分类表（通用平台）：由租户/项目通过管理 API 自定义注册；系统不内置任何业务分类。';
+COMMENT ON COLUMN graph_category.project_id IS '项目级分类；通用模板可使用 *，但默认不再下发任何通用模板。';
+COMMENT ON COLUMN graph_category.domain IS '业务域标签（自由文本，仅作字符校验）；由租户自定义，例如 asset/event/integration 等，不再强制枚举。';
 
 CREATE TABLE IF NOT EXISTS graph_entity_type (
   entity_type varchar(64) PRIMARY KEY,
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS graph_entity_type (
 
 CREATE INDEX IF NOT EXISTS idx_graph_entity_type_status ON graph_entity_type (status, sort_order, entity_type);
 
-COMMENT ON TABLE graph_entity_type IS '真实知识图谱实体类型表：定义 Device、Vessel、Protocol 等本体节点类型';
+COMMENT ON TABLE graph_entity_type IS '知识图谱实体类型表（通用平台）：由租户/项目通过管理 API 自行注册；系统仅内置极少量平台级保护类型（如 SourceBlock/Document/Section），不内置任何业务领域类型。';
 
 CREATE TABLE IF NOT EXISTS graph_relation_type (
   relation_type varchar(64) PRIMARY KEY,
@@ -82,7 +84,7 @@ CREATE TABLE IF NOT EXISTS graph_relation_type (
 CREATE INDEX IF NOT EXISTS idx_graph_relation_type_status ON graph_relation_type (status, sort_order, relation_type);
 CREATE INDEX IF NOT EXISTS idx_graph_relation_type_inverse ON graph_relation_type (inverse_relation_type) WHERE inverse_relation_type IS NOT NULL;
 
-COMMENT ON TABLE graph_relation_type IS '真实知识图谱关系类型表：定义 INSTALLED_ON、BOUND_TO、USES_PROTOCOL 等边类型';
+COMMENT ON TABLE graph_relation_type IS '知识图谱关系类型表（通用平台）：由租户/项目通过管理 API 自行注册；系统仅内置平台级保护关系（如 HAS_EVIDENCE），不内置任何业务领域关系。';
 
 CREATE TABLE IF NOT EXISTS knowledge_block (
   block_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -198,7 +200,7 @@ CREATE TABLE IF NOT EXISTS graph_review_task (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ck_review_task_object CHECK (object_type IN ('entity','relation','batch')),
-  CONSTRAINT ck_review_task_reason CHECK (reason_code IN ('low_confidence','conflict','duplicate','security','schema_invalid','missing_evidence')),
+  CONSTRAINT ck_review_task_reason CHECK (reason_code ~ '^[a-z][a-z0-9_]{0,63}$'),
   CONSTRAINT ck_review_task_priority CHECK (priority IN ('P0','P1','P2')),
   CONSTRAINT ck_review_task_status CHECK (status IN ('pending','approved','rejected','merged','canceled')),
   CONSTRAINT ck_review_task_decision_json CHECK (jsonb_typeof(decision_payload) = 'object')

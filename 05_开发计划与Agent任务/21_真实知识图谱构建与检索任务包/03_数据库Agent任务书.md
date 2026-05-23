@@ -17,7 +17,8 @@
 | 类型 | 路径 |
 | --- | --- |
 | 新增 SQL | `04_数据库与API/08A_建表SQL/` |
-| seed SQL | `04_数据库与API/08A_建表SQL/graph_taxonomy_seed.sql` 或 `infra/postgres/seed/` |
+| 平台保护类型 seed | `04_数据库与API/08A_建表SQL/graph_protected_taxonomy.sql` |
+| 示例本体包（不自动加载） | `04_数据库与API/08A_建表SQL/examples/` |
 | init 引用 | `infra/postgres/init.sql` |
 | 验证说明 | `06_测试与发布/` 或任务交接中记录 |
 
@@ -45,25 +46,21 @@
   - 所有 JSONB 字段有默认值或允许空的解释。
   - candidate/review/query 表有必要索引。
 
-### KG-DB-002 graph taxonomy seed
+### KG-DB-002 平台保护类型 seed（不内置业务本体）
 
-- 目标：把 07F 中的分类、本体、关系类型落成初始数据。
-- 必须包含 graphCategoryId：
-  - `geo-vessel`
-  - `vessel-crew`
-  - `vessel-device`
-  - `device-alarm`
-  - `device-protocol`
-  - `api-db`
-  - `ops-log`
-  - `case-fix`
-- 必须包含实体类型：
-  - Region、Port、Vessel、Crew、Role、Duty、Device、DeviceType、Alarm、AlarmRule、Threshold、Protocol、Metric、ProtocolField、API、Controller、Service、Mapper、Table、Column、Job、LogPattern、Alert、Incident、Symptom、Cause、FixAction、SourceBlock
-- 必须包含关系类型：
-  - LOCATED_IN、MANAGED_BY、CREW_ON、HAS_ROLE、ON_DUTY、INSTALLED_ON、HAS_DEVICE_TYPE、RAISED_BY、BOUND_TO、TRIGGERS、USES_PROTOCOL、HAS_FIELD、MAPS_TO、CALLS、QUERIES、OBSERVED_IN、EMITS、DEPENDS_ON、POSSIBLE_CAUSE、FIXED_BY、VERIFIED_BY、HAS_EVIDENCE
+- 目标：把 07F §1A、§7 规定的"平台保护类型"落成初始数据，**不再 seed 任何业务领域本体**。
+- 必须包含的实体类型（仅 3 个保护类型，作用域 `tenant_id='__platform__'`, `project_id='*'`）：
+  - `SourceBlock`、`Document`、`Section`
+- 必须包含的关系类型（仅 3 个保护关系）：
+  - `HAS_EVIDENCE`（from=`*`, to=`SourceBlock`）
+  - `HAS_SECTION`（from=`Document`, to=`Section`）
+  - `IN_SECTION`（from=`SourceBlock`, to=`Section`）
+- 禁止在该 seed 中插入任何 `graph_category` 数据；分类、业务实体类型、业务关系类型一律由租户通过 KG-016/019/020 接口运行时注册。
 - DoD：
-  - seed 可重复执行，不产生重复数据。
-  - taxonomy API 可按这些数据返回前端下拉。
+  - seed 可重复执行，ON CONFLICT 更新但不重复；
+  - 启动后调用 `GET /api/v1/graphs/taxonomy` 必须返回 `categories=[]`、`entityTypes=[3 个保护类型]`、`relationTypes=[3 个保护关系]`；
+  - `04_数据库与API/08A_建表SQL/examples/` 下保留示例本体包（如 `graph_taxonomy_example_marine.sql`），但 `infra/postgres/init.sql` 不得加载；
+  - 任何对保护类型的修改/删除尝试在数据库或后端必须可被识别为受保护项（`ICSS-KG-403-PROTECTED_TYPE`）。
 
 ### KG-DB-003 pgvector block 索引
 
@@ -96,7 +93,8 @@
 交接给接口/后端 Agent 时必须说明：
 
 1. 新增表名和字段是否与 07F 有偏差。
-2. taxonomy seed 中每个分类允许哪些实体/关系。
+2. 平台保护类型 seed 实际加载的实体/关系。
 3. 向量维度是多少。
 4. 哪些字段暂时 nullable。
 5. 已运行的 SQL 验证结果。
+6. 提醒下游：业务分类/实体/关系**全部需要租户通过 KG-016/019/020 在运行时注册**，禁止前端、后端、AI 服务任何地方硬编码业务本体名称。

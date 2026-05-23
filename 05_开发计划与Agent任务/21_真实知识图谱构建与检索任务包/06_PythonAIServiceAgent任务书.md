@@ -83,8 +83,8 @@ ai-service-python/app/
 ### KG-AI-004 Entity normalizer 与 conflict detector
 
 - 目标：识别别名、重复实体、冲突关系。
-- 示例：TC003、TC-003、3号温度传感器可归一为一个 Device 候选。
-- 冲突示例：同一 Device 同时 INSTALLED_ON 两艘不同船。
+- 示例（仅成型）：同一实体的多个别名/写法可被归一到一个 candidate，具体名称、别名表、`uniqueKey` 字段均来自调用方 taxonomy。
+- 冲突示例（仅成型）：同一个实体被设置为与两个不同目标同时存在同一条业务上不允许复多的关系。
 - DoD：
   - 输出 accepted/reviewing/conflict 建议状态。
   - 冲突必须带 reason_code 和候选对象 ID。
@@ -95,7 +95,7 @@ ai-service-python/app/
 - 输入：questionText、context、taxonomy。
 - 输出：候选实体、graphCategoryIds、relationTypes、maxDepth、vector query text。
 - DoD：
-  - 能识别 deviceId/vessel/alarm/protocol/time 等上下文。
+  - 能根据传入的 taxonomy/entityTypes 识别上下文中的实体标识、范围限定、时间窗口；**不能硬编码任何业务名称**。
   - 无法识别实体时给出 vector fallback plan。
   - 不返回 Cypher，由 Java 后端执行参数化查询。
 

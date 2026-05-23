@@ -15,36 +15,36 @@
 
 ### KG-QA-001 样例数据集
 
-建议新增目录：
+建议新增目录（文件名仅示例，实际由测试 Agent 根据租户已注册的分类自行命名；不要求与下面名称完全一致）：
 
 ```text
 06_测试与发布/kg-fixtures/
   structured/
-    device_alarm_rule.json
-    vessel_device.csv
-    protocol_fields.ini
-    region_vessel.md
+    sample_structured_a.json
+    sample_structured_b.csv
+    sample_structured_c.ini
+    sample_structured_d.md
   unstructured/
-    device_alarm_manual.md
-    protocol_description.docx
-    alarm_rule_sheet.xlsx
-    ops_error_log.log
-    pdf_sample.pdf
+    sample_unstructured_a.md
+    sample_unstructured_b.docx
+    sample_unstructured_c.xlsx
+    sample_unstructured_d.log
+    sample_unstructured_e.pdf
   expected/
     expected_entities.json
     expected_relations.json
     expected_paths.json
 ```
 
-必须覆盖：
+必须覆盖（**分类与本体必须先由测试 Agent 通过 KG-016/019/020 在测试租户中注册**；下方仅为最小用例形态，不指定具体业务名称）：
 
-| 分类 | 样例 |
+| 用例形态 | 验收要点 |
 | --- | --- |
-| geo-vessel | 地区与船舶归属 |
-| vessel-device | 船舶与设备绑定 |
-| device-alarm | 设备与告警规则 |
-| device-protocol | 设备与协议字段 |
-| ops-log | 运维日志错误模式 |
+| 结构化键值文件 | rule extractor 能产出 candidates 与 evidence |
+| 结构化表格 | section_path/row/col 正确 |
+| 自然语言段落 | LLM extractor 输出符合 07F §11.2 schema |
+| 跨文档别名归一 | normalizer 产出 reviewing/conflict |
+| 含低置信度证据 | 走 review_task 而非直接发布 |
 
 ## 4. 接口与集成测试
 

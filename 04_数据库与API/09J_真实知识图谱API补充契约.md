@@ -6,8 +6,10 @@
 - 适用范围：真实知识图谱构建与检索 V0.2
 - Base Path：`/api/v1`
 - 上游依据：`03_技术方案与架构/07F_真实知识图谱构建与检索详细设计.md`、KG-API-001、KG-API-002
-- 依赖数据库：`real_kg_schema.sql`、`graph_taxonomy_seed.sql`
-- 设计原则：真实关系图谱优先；pgvector 只作为语义召回和证据补充；LLM 抽取结果只能作为候选，不能直接发布。
+- 依赖数据库：`real_kg_schema.sql`、`graph_protected_taxonomy.sql`
+- 设计原则：
+  - **通用平台**：不内置任何业务领域本体，本文示例中出现的 `<EntityTypeA>` `<RELATION_A>` `<category-id>` 等占位名均须由租户通过 KG-ADMIN-* 注册后代入。
+  - 真实关系图谱优先；pgvector 只作为语义召回和证据补充；LLM 抽取结果只能作为候选，不能直接发布。
 
 ## 2. 通用请求头
 
@@ -33,14 +35,14 @@
 
 ```json
 {
-  "categoryId": "device-alarm",
-  "categoryName": "设备与告警",
-  "domain": "event",
-  "description": "维护设备、告警、规则和阈值关系",
-  "entityTypeScope": ["Device", "Alarm", "AlarmRule"],
-  "relationTypeScope": ["RAISED_BY", "BOUND_TO", "TRIGGERS"],
+  "categoryId": "<category-id>",
+  "categoryName": "<分类名>",
+  "domain": "<租户自定义域标签>",
+  "description": "<说明>",
+  "entityTypeScope": ["<EntityTypeA>", "<EntityTypeB>"],
+  "relationTypeScope": ["<RELATION_A>"],
   "status": "enabled",
-  "sortOrder": 40
+  "sortOrder": 10
 }
 ```
 
@@ -50,14 +52,14 @@
 {
   "blockId": "uuid",
   "sourceId": "uuid",
-  "graphCategoryId": "device-alarm",
+  "graphCategoryId": "<category-id>",
   "blockType": "paragraph",
-  "sectionPath": "第2章/告警规则",
+  "sectionPath": "<章节路径>",
   "pageNo": 3,
   "rowNo": null,
   "colNo": null,
-  "rawText": "TC-003 绑定超载告警规则 AR-17",
-  "normalizedText": "设备 TC-003 绑定 告警规则 AR-17",
+  "rawText": "<原文>",
+  "normalizedText": "<规范化后文本>",
   "contentHash": "sha256",
   "metadata": {"parser": "docling"},
   "createdAt": "2026-05-23T10:00:00+08:00"
@@ -71,12 +73,12 @@
   "candidateId": "uuid",
   "sourceId": "uuid",
   "blockId": "uuid",
-  "graphCategoryId": "device-alarm",
-  "entityType": "Device",
-  "rawName": "TC-003",
-  "canonicalName": "TC-003",
-  "uniqueKey": {"deviceId": "TC-003"},
-  "properties": {"deviceType": "temperature_sensor"},
+  "graphCategoryId": "<category-id>",
+  "entityType": "<EntityTypeA>",
+  "rawName": "<原始名称>",
+  "canonicalName": "<规范名>",
+  "uniqueKey": {"<keyField>": "<value>"},
+  "properties": {"<prop>": "<value>"},
   "evidenceBlockIds": ["uuid"],
   "confidence": 0.88,
   "extractor": "rule",
@@ -93,9 +95,9 @@
   "sourceId": "uuid",
   "sourceCandidateId": "uuid",
   "targetCandidateId": "uuid",
-  "graphCategoryId": "device-alarm",
-  "relationType": "BOUND_TO",
-  "properties": {"threshold": "90%", "enabled": true},
+  "graphCategoryId": "<category-id>",
+  "relationType": "<RELATION_A>",
+  "properties": {"<prop>": "<value>"},
   "evidenceBlockIds": ["uuid"],
   "confidence": 0.84,
   "extractor": "llm",
@@ -110,12 +112,12 @@
 {
   "nodes": [
     {
-      "id": "Device:TC-003",
-      "entityId": "TC-003",
-      "entityType": "Device",
-      "name": "TC-003",
-      "aliases": ["TC003"],
-      "graphCategoryIds": ["device-alarm"],
+      "id": "<EntityTypeA>:<entityId>",
+      "entityId": "<entityId>",
+      "entityType": "<EntityTypeA>",
+      "name": "<名称>",
+      "aliases": ["<别名>"],
+      "graphCategoryIds": ["<category-id>"],
       "sourceRefs": ["sourceId"],
       "confidence": 0.91,
       "status": "published",
@@ -126,15 +128,15 @@
   "edges": [
     {
       "id": "relationId",
-      "source": "Device:TC-003",
-      "target": "AlarmRule:AR-17",
-      "relationType": "BOUND_TO",
+      "source": "<EntityTypeA>:<entityId>",
+      "target": "<EntityTypeB>:<entityId>",
+      "relationType": "<RELATION_A>",
       "sourceRefs": ["sourceId"],
       "evidenceRefs": ["blockId"],
       "confidence": 0.91,
       "status": "published",
       "revisionId": "uuid",
-      "properties": {"threshold": "90%"}
+      "properties": {"<prop>": "<value>"}
     }
   ]
 }
@@ -159,6 +161,12 @@
 | KG-013 | GET | `/api/v1/graphs/evidence` | graph:view | 证据块溯源 |
 | KG-014 | GET | `/api/v1/graphs/review-tasks` | graph:review | 低置信度/冲突复核任务 |
 | KG-015 | PATCH | `/api/v1/graphs/review-tasks/{taskId}` | graph:review | 复核通过/驳回/合并 |
+| KG-016 | POST | `/api/v1/graphs/taxonomy/categories` | graph:admin | 租户注册业务分类 |
+| KG-017 | PUT | `/api/v1/graphs/taxonomy/categories/{categoryId}` | graph:admin | 更新分类 |
+| KG-018 | DELETE | `/api/v1/graphs/taxonomy/categories/{categoryId}` | graph:admin | 启用/禁用/删除分类 |
+| KG-019 | POST/PUT/DELETE | `/api/v1/graphs/taxonomy/entity-types[/{entityType}]` | graph:admin | 租户注册/更新/禁用实体类型（平台保护类型只读） |
+| KG-020 | POST/PUT/DELETE | `/api/v1/graphs/taxonomy/relation-types[/{relationType}]` | graph:admin | 租户注册/更新/禁用关系类型（平台保护关系只读） |
+| KG-021 | POST | `/api/v1/graphs/taxonomy/import` | graph:admin | 批量导入本体包（JSON），默认 dry-run 预览 |
 
 ## 6. API 详情
 
@@ -187,13 +195,13 @@
 - 必填：`graphCategoryId`、`sourceType`、`sensitivityLevel`
 - 二选一：`rawText` 或 `file`
 
-请求 JSON：
+请求 JSON（示例中 `<category-id>` 为租户已注册的分类名）：
 
 ```json
 {
-  "graphCategoryId": "device-alarm",
+  "graphCategoryId": "<category-id>",
   "sourceType": "text",
-  "rawText": "TC-003 绑定 AR-17，阈值 90%",
+  "rawText": "<上传文本>",
   "sensitivityLevel": "internal"
 }
 ```
@@ -207,7 +215,7 @@
   "parserStatus": "pending",
   "extractStatus": "pending",
   "graphBuildStatus": "pending",
-  "graphCategoryId": "device-alarm"
+  "graphCategoryId": "<category-id>"
 }
 ```
 
@@ -301,7 +309,7 @@
   "baseRevisionId": "uuid",
   "nodeChanges": [],
   "edgeChanges": [],
-  "editReason": "修正 TC-003 绑定关系"
+  "editReason": "<编辑原因>"
 }
 ```
 
@@ -332,17 +340,18 @@
 - 路径：`/api/v1/graphs/search/diagnosis`
 - 说明：诊断检索只能命中 `published + activeRevision` 图谱。
 
-请求 Body：
+请求 Body（示例中占位为租户自己已注册的名称）：
 
 ```json
 {
-  "questionText": "TC-003 超载告警不准",
+  "questionText": "<问题描述>",
   "context": {
-    "deviceId": "TC-003",
-    "vesselId": "MINX-001",
+    "entities": [
+      {"entityType": "<EntityTypeA>", "entityId": "<id>"}
+    ],
     "timeRange": {"start": "2026-05-22T00:00:00+08:00", "end": "2026-05-23T00:00:00+08:00"}
   },
-  "graphCategoryIds": ["vessel-device", "device-alarm", "device-protocol"],
+  "graphCategoryIds": ["<category-id>"],
   "maxDepth": 3
 }
 ```
@@ -405,31 +414,79 @@
 {
   "decision": "approved",
   "decisionPayload": {
-    "canonicalName": "TC-003",
+    "canonicalName": "<规范名>",
     "mergeToCandidateId": null
   },
-  "comment": "证据明确，允许入图"
+  "comment": "<复核说明>"
 }
 ```
 
 错误码：`ICSS-KG-404-REVIEW_TASK_NOT_FOUND`、`ICSS-COMMON-400-INVALID_PARAMETER`、`ICSS-AUTH-403-OPERATION_DENIED`。
 
-## 7. Mock 场景
+### KG-016 createGraphCategory
+
+- 方法：POST；路径：`/api/v1/graphs/taxonomy/categories`。
+- 必填：`categoryId`、`categoryName`、`domain`、`entityTypeScope`、`relationTypeScope`。
+- 作用域：`(X-Project-Id)` 项目级；不允许 `projectId='*'`。
+- 参考 `4.1 TaxonomyCategory`。
+- 所有 `entityTypeScope` / `relationTypeScope` 中的名称必须已在本租户中注册，否则返回 `ICSS-KG-400-ENTITY_TYPE_INVALID` / `ICSS-KG-400-RELATION_TYPE_INVALID`。
+- 冲突：`(tenantId, projectId, categoryId)` 唯一，已存在返回 `ICSS-KG-409-CATEGORY_DUPLICATED`。
+
+### KG-017 updateGraphCategory
+
+- 方法：PUT；路径：`/api/v1/graphs/taxonomy/categories/{categoryId}`。
+- 允许修改：`categoryName`、`domain`、`description`、`entityTypeScope`、`relationTypeScope`、`status`、`sortOrder`。
+- 不允许修改：`categoryId`。
+
+### KG-018 deleteGraphCategory
+
+- 方法：DELETE；路径：`/api/v1/graphs/taxonomy/categories/{categoryId}`。
+- 语义：软删除（`status='disabled'`）。错误码：`ICSS-KG-404-CATEGORY_NOT_FOUND`、`ICSS-KG-409-CATEGORY_IN_USE`。
+
+### KG-019 manageEntityType
+
+- 路径：`POST /api/v1/graphs/taxonomy/entity-types`、`PUT /...{entityType}`、`DELETE /...{entityType}`。
+- Body 参照 07F §7.3 示例。
+- 保护类型 `SourceBlock`/`Document`/`Section` 不允许修改唯一键/删除，返回 `ICSS-KG-403-PROTECTED_TYPE`。
+- 名称正则：`^[A-Z][A-Za-z0-9]{0,63}$`，不符返回 `ICSS-KG-400-NAME_INVALID`。
+- 删除拒绝场景：该实体类型已被业务 graph_category/graph_relation_type/knowledge_source 引用返回 `ICSS-KG-409-ENTITY_TYPE_IN_USE`。
+
+### KG-020 manageRelationType
+
+- 路径：`POST /api/v1/graphs/taxonomy/relation-types`、`PUT /...{relationType}`、`DELETE /...{relationType}`。
+- Body 参照 07F §7.3 示例。
+- 保护关系 `HAS_EVIDENCE`/`HAS_SECTION`/`IN_SECTION` 不允许修改 from/to 类型集合与删除，返回 `ICSS-KG-403-PROTECTED_TYPE`。
+- 名称正则：`^[A-Z][A-Z0-9_]{0,63}$`。
+- `fromEntityTypes` / `toEntityTypes` 中的名称必须已注册或为通配 `*`。
+
+### KG-021 importTaxonomy
+
+- 方法：POST；路径：`/api/v1/graphs/taxonomy/import`。
+- Body：`{ "dryRun": true, "entityTypes":[...], "relationTypes":[...], "categories":[...] }`；默认 `dryRun=true`。
+- 幂等：必填 `X-Idempotency-Key`。
+- 响应：`{ inserted, updated, skipped, errors[] }`；存在错误且非 dryRun 时事务回滚。
+
+## 7. Mock 场景（占位本体表述）
 
 | 场景 | 触发 | 预期 |
 | --- | --- | --- |
-| kg_success_structured | 结构化文本 TC-003 绑定 AR-17 | 生成 Device、AlarmRule、BOUND_TO |
+| kg_empty_taxonomy | 初始部署后调用 KG-001 | `categories=[]`、`entityTypes=[仅平台保护类型]`、`relationTypes=[仅平台保护关系]` |
+| kg_admin_register | 调用 KG-019/KG-020/KG-016 依次注册一条实体类型、关系类型、分类 | KG-001 可查到新注册项 |
+| kg_protected_type_locked | 调用 KG-019 DELETE `SourceBlock` | 返回 `ICSS-KG-403-PROTECTED_TYPE` |
+| kg_invalid_scope | KG-016 传入 `entityTypeScope` 含未注册名称 | 返回 `ICSS-KG-400-ENTITY_TYPE_INVALID` |
+| kg_success_structured | 以租户已注册本体为前提，上传表述两实体关系的结构化文本 | 生成对应 candidate 实体与 candidate 关系 |
 | kg_success_file | 上传 md/csv/xlsx/docx/pdf | 生成 blocks 与 candidates |
 | kg_low_confidence | OCR 或 LLM 置信度低 | 生成 review task，不允许直接发布 |
-| kg_conflict_relation | TC-003 被两份资料绑定到不同船舶 | candidate relation 为 conflict，发布 409 |
+| kg_conflict_relation | 同一实体被两份资料绑定到不同目标实体 | candidate relation 为 conflict，发布 409 |
 | kg_publish_success | 无冲突且 evidenceRefs 完整 | activeRevisionId 生效 |
 | kg_rollback_success | 指定旧版本回滚 | diagnosis search 命中回滚后版本 |
 | kg_project_denied | 跨项目查询 | 403 或空结果，不泄露详情 |
 
 ## 8. 下游实现约束
 
-1. 前端所有分类、实体类型、关系类型必须来自 KG-001。
-2. Java 后端是唯一发布图谱和写 Neo4j 的入口。
-3. Python AI Service 只能返回 blocks/candidates/plans。
+1. 前端所有分类、实体类型、关系类型必须来自 KG-001；**禁止在前端代码中硬编码任何业务本体名称**，遇到空 taxonomy 需引导用户到管理页面执行 KG-016 到 KG-021 注册。
+2. Java 后端是唯一发布图谱和写 Neo4j 的入口；在接受 candidate/source 创建请求时，必须校验 `entityType`/`relationType`/`graphCategoryId` 均已在本租户 taxonomy 中注册。
+3. Python AI Service 只能返回 blocks/candidates/plans；candidates 中必须携带调用方传入的本体名称，不得比输入多出新名称。
 4. `vectorEvidence` 不能被显示成真实关系，只能显示为语义证据。
 5. 没有 `evidenceRefs` 的关系禁止进入 `published`。
+6. 平台保护类型（`SourceBlock`/`Document`/`Section` 及 `HAS_EVIDENCE`/`HAS_SECTION`/`IN_SECTION`）仅可读，任何修改/删除请求返回 `ICSS-KG-403-PROTECTED_TYPE`。
