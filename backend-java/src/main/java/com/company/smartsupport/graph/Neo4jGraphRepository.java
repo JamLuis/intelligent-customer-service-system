@@ -80,6 +80,82 @@ public class Neo4jGraphRepository {
         }
     }
 
+    public void upsertKnowledgeEntity(Map<String, Object> entity) {
+        updateStatus("""
+                MERGE (e:KnowledgeEntity {
+                    tenantId:$tenantId,
+                    projectId:$projectId,
+                    entityType:$entityType,
+                    entityId:$entityId
+                })
+                SET e.entityName = $entityName,
+                    e.aliases = $aliases,
+                    e.graphCategoryIds = $graphCategoryIds,
+                    e.sourceRefs = $sourceRefs,
+                    e.evidenceRefs = $evidenceRefs,
+                    e.confidence = $confidence,
+                    e.status = $status,
+                    e.revisionId = $revisionId,
+                    e.properties = $properties,
+                    e.updatedAt = datetime()
+                RETURN count(e) AS updated
+                """, Map.ofEntries(
+                Map.entry("projectId", text(entity, "projectId")),
+                Map.entry("entityType", text(entity, "entityType")),
+                Map.entry("entityId", text(entity, "entityId")),
+                Map.entry("entityName", text(entity, "entityName")),
+                Map.entry("aliases", list(entity, "aliases")),
+                Map.entry("graphCategoryIds", list(entity, "graphCategoryIds")),
+                Map.entry("sourceRefs", list(entity, "sourceRefs")),
+                Map.entry("evidenceRefs", list(entity, "evidenceRefs")),
+                Map.entry("confidence", number(entity, "confidence", 0.0)),
+                Map.entry("status", textOrDefault(entity, "status", "draft")),
+                Map.entry("revisionId", text(entity, "revisionId")),
+                Map.entry("properties", map(entity, "properties"))));
+    }
+
+    public void upsertRelation(Map<String, Object> relation) {
+        updateStatus("""
+                MATCH (source:KnowledgeEntity {
+                    tenantId:$tenantId,
+                    projectId:$projectId,
+                    entityType:$sourceEntityType,
+                    entityId:$sourceEntityId
+                })
+                MATCH (target:KnowledgeEntity {
+                    tenantId:$tenantId,
+                    projectId:$projectId,
+                    entityType:$targetEntityType,
+                    entityId:$targetEntityId
+                })
+                MERGE (source)-[r:RELATION {relationId:$relationId}]->(target)
+                SET r.tenantId = $tenantId,
+                    r.projectId = $projectId,
+                    r.relationType = $relationType,
+                    r.sourceRefs = $sourceRefs,
+                    r.evidenceRefs = $evidenceRefs,
+                    r.confidence = $confidence,
+                    r.status = $status,
+                    r.revisionId = $revisionId,
+                    r.properties = $properties,
+                    r.updatedAt = datetime()
+                RETURN count(r) AS updated
+                """, Map.ofEntries(
+                Map.entry("projectId", text(relation, "projectId")),
+                Map.entry("sourceEntityType", text(relation, "sourceEntityType")),
+                Map.entry("sourceEntityId", text(relation, "sourceEntityId")),
+                Map.entry("targetEntityType", text(relation, "targetEntityType")),
+                Map.entry("targetEntityId", text(relation, "targetEntityId")),
+                Map.entry("relationId", text(relation, "relationId")),
+                Map.entry("relationType", text(relation, "relationType")),
+                Map.entry("sourceRefs", list(relation, "sourceRefs")),
+                Map.entry("evidenceRefs", list(relation, "evidenceRefs")),
+                Map.entry("confidence", number(relation, "confidence", 0.0)),
+                Map.entry("status", textOrDefault(relation, "status", "draft")),
+                Map.entry("revisionId", text(relation, "revisionId")),
+                Map.entry("properties", map(relation, "properties"))));
+    }
+
     private Optional<String> findStatus(String cypher, Map<String, Object> params) {
         try (var session = driver.session(SessionConfig.forDatabase(database))) {
             var record = session.executeRead(tx -> tx.run(cypher, withTenant(params)).single());
@@ -108,5 +184,30 @@ public class Neo4jGraphRepository {
         java.util.HashMap<String, Object> copy = new java.util.HashMap<>(params);
         copy.put("tenantId", TENANT_ID);
         return Values.value(copy);
+    }
+
+    private String text(Map<String, Object> source, String key) {
+        Object value = source.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String textOrDefault(Map<String, Object> source, String key, String defaultValue) {
+        String value = text(source, key);
+        return value.isBlank() ? defaultValue : value;
+    }
+
+    private Object number(Map<String, Object> source, String key, double defaultValue) {
+        Object value = source.get(key);
+        return value instanceof Number ? value : defaultValue;
+    }
+
+    private Object list(Map<String, Object> source, String key) {
+        Object value = source.get(key);
+        return value instanceof java.util.List<?> ? value : java.util.List.of();
+    }
+
+    private Object map(Map<String, Object> source, String key) {
+        Object value = source.get(key);
+        return value instanceof Map<?, ?> ? value : Map.of();
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.company.smartsupport.common.RequestContext;
 import com.company.smartsupport.common.SmartSupportException;
+import com.company.smartsupport.graph.cache.GraphCacheService;
 import com.company.smartsupport.graph.dto.GraphObjectActionRequest;
 import com.company.smartsupport.graph.dto.GraphObjectActionResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,16 +24,19 @@ public class FreezeService {
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;
     private final RequestContext requestContext;
+    private final GraphCacheService graphCacheService;
 
     public FreezeService(
             Neo4jGraphRepository neo4jGraphRepository,
             JdbcClient jdbcClient,
             ObjectMapper objectMapper,
-            RequestContext requestContext) {
+            RequestContext requestContext,
+            GraphCacheService graphCacheService) {
         this.neo4jGraphRepository = neo4jGraphRepository;
         this.jdbcClient = jdbcClient;
         this.objectMapper = objectMapper;
         this.requestContext = requestContext;
+        this.graphCacheService = graphCacheService;
     }
 
     @Transactional
@@ -75,6 +79,7 @@ public class FreezeService {
         }
 
         updater.update(from, to);
+        graphCacheService.invalidateOnGraphMutation(projectId, action);
         OffsetDateTime operatedAt = OffsetDateTime.now();
         insertAudit(projectId, objectType, objectId, action, from, to, request.reason(), operatedAt);
         return new GraphObjectActionResponse(objectType, objectId, action, from, to, request.reason(), operatedAt);
