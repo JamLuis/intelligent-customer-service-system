@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS knowledge_source (
   tenant_id varchar(64) NOT NULL DEFAULT 'default',
   project_id varchar(64) NOT NULL,
   source_type varchar(16) NOT NULL,
+  graph_category_id varchar(64),
+  graph_category_name varchar(128),
   file_name varchar(255),
   object_key varchar(512),
   source_hash varchar(128) NOT NULL,
@@ -32,5 +34,6 @@ CREATE TABLE IF NOT EXISTS knowledge_source (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_knowledge_source_hash ON knowledge_source (tenant_id, project_id, source_hash) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_source_project_status ON knowledge_source (tenant_id, project_id, status, updated_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_source_graph_category ON knowledge_source (tenant_id, project_id, graph_category_id, updated_at DESC) WHERE deleted_at IS NULL;
 
 COMMENT ON TABLE knowledge_source IS '知识源表：记录文件、图片、文本来源及解析、抽取、入图状态';

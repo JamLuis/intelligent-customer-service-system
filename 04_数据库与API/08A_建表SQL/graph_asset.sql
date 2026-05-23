@@ -6,9 +6,14 @@ CREATE TABLE IF NOT EXISTS graph_asset (
   tenant_id varchar(64) NOT NULL DEFAULT 'default',
   project_id varchar(64) NOT NULL,
   graph_type varchar(32) NOT NULL DEFAULT 'knowledge',
+  graph_category_id varchar(64),
+  graph_category_name varchar(128),
   graph_name varchar(200) NOT NULL,
   neo4j_graph_ref varchar(256),
   source_refs jsonb NOT NULL DEFAULT '[]'::jsonb,
+  entity_types jsonb NOT NULL DEFAULT '[]'::jsonb,
+  relation_types jsonb NOT NULL DEFAULT '[]'::jsonb,
+  classification_path jsonb NOT NULL DEFAULT '[]'::jsonb,
   node_count int NOT NULL DEFAULT 0,
   edge_count int NOT NULL DEFAULT 0,
   confidence numeric(4,2) NOT NULL DEFAULT 0,
@@ -27,6 +32,7 @@ CREATE TABLE IF NOT EXISTS graph_asset (
 );
 
 CREATE INDEX IF NOT EXISTS idx_graph_project_status ON graph_asset (tenant_id, project_id, status, updated_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_graph_category_status ON graph_asset (tenant_id, project_id, graph_category_id, status, updated_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_graph_batch ON graph_asset (batch_id) WHERE deleted_at IS NULL;
 
 COMMENT ON TABLE graph_asset IS '图谱资产表：记录 Neo4j 子图元数据、来源、版本状态和统计信息';

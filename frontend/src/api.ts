@@ -72,8 +72,11 @@ export const api = {
   retryKnowledge(sourceId: string) {
     return unwrap<Record<string, unknown>>(client.post(`/v1/knowledge/sources/${sourceId}/retry`, {}, { headers: headers(true) }));
   },
-  queryGraphs() {
-    return unwrap<Record<string, unknown>>(client.get('/v1/graphs/assets', { headers: headers() }));
+  queryGraphs(params?: Record<string, unknown>) {
+    return unwrap<Record<string, unknown>>(client.get('/v1/graphs/assets', { headers: headers(), params }));
+  },
+  listGraphCategories() {
+    return unwrap<Record<string, unknown>>(client.get('/v1/graphs/assets/categories', { headers: headers() }));
   },
   updateGraphDraft(graphId: string, body: Record<string, unknown>) {
     return unwrap<Record<string, unknown>>(client.patch(`/v1/graphs/assets/${graphId}/draft`, body, { headers: headers(true) }));

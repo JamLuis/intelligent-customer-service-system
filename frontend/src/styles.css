@@ -232,6 +232,30 @@ body {
   gap: 14px;
 }
 
+.knowledge-two-column {
+  display: grid;
+  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.graph-maintenance-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.taxonomy-card {
+  grid-column: span 2;
+}
+
+.graph-preview-card,
+.graph-maintenance-card,
+.graph-library-card {
+  min-width: 0;
+}
+
 .wide-card {
   grid-column: span 2;
 }
@@ -249,6 +273,7 @@ body {
 .knowledge-form-grid {
   display: grid;
   gap: 10px;
+  margin-bottom: 12px;
 }
 
 .file-drop-zone {
@@ -282,6 +307,97 @@ body {
 
 .graph-header-actions .el-select {
   width: min(320px, 100%);
+}
+
+.filter-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.graph-category-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.graph-list-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d7e1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17202a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-list-item.active,
+.graph-list-item:hover {
+  border-color: #327c96;
+  background: #f2fafc;
+}
+
+.graph-list-item strong,
+.graph-list-item span,
+.graph-list-item small {
+  display: block;
+}
+
+.graph-list-item span,
+.graph-list-item small {
+  color: #687982;
+  font-size: 12px;
+}
+
+.graph-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.graph-summary-strip div {
+  padding: 10px;
+  border: 1px solid #d7e1e5;
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.graph-summary-strip span,
+.graph-summary-strip strong {
+  display: block;
+}
+
+.graph-summary-strip span {
+  color: #687982;
+  font-size: 12px;
+}
+
+.graph-summary-strip strong {
+  margin-top: 4px;
+}
+
+.taxonomy-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.taxonomy-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #d7e1e5;
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.taxonomy-item span {
+  color: #687982;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .graph-editor {
@@ -376,8 +492,19 @@ pre {
 @media (max-width: 1080px) {
   .chat-layout,
   .admin-grid,
+  .knowledge-two-column,
+  .graph-maintenance-layout,
   .graph-workbench {
     grid-template-columns: 1fr;
+  }
+
+  .taxonomy-card {
+    grid-column: span 1;
+  }
+
+  .taxonomy-grid,
+  .graph-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .graph-side-panel {
@@ -411,7 +538,9 @@ pre {
   }
 
   .runtime-panel,
-  .guided-form {
+  .guided-form,
+  .taxonomy-grid,
+  .graph-summary-strip {
     grid-template-columns: 1fr;
   }
 

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AppLayout from '../components/AppLayout.vue';
 import ChatView from '../views/ChatView.vue';
-import AdminKnowledgeView from '../views/admin/AdminKnowledgeView.vue';
+import AdminGraphMaintenanceView from '../views/admin/AdminGraphMaintenanceView.vue';
+import AdminKnowledgeIngestView from '../views/admin/AdminKnowledgeIngestView.vue';
 import AdminMcpToolsView from '../views/admin/AdminMcpToolsView.vue';
 import AdminTicketsView from '../views/admin/AdminTicketsView.vue';
 
@@ -22,8 +23,19 @@ export const router = createRouter({
         {
           path: 'admin/knowledge',
           name: 'admin-knowledge',
-          component: AdminKnowledgeView,
-          meta: { title: '知识库与图谱', subtitle: '维护知识源、入图任务和图谱资产' }
+          redirect: '/admin/knowledge/ingest'
+        },
+        {
+          path: 'admin/knowledge/ingest',
+          name: 'admin-knowledge-ingest',
+          component: AdminKnowledgeIngestView,
+          meta: { title: '知识录入与预览', subtitle: '按图谱分类录入知识源并预览入图结果' }
+        },
+        {
+          path: 'admin/knowledge/graphs',
+          name: 'admin-graph-maintenance',
+          component: AdminGraphMaintenanceView,
+          meta: { title: '历史知识图谱维护', subtitle: '按分类、实体和关系维护历史图谱资产' }
         },
         {
           path: 'admin/tickets',

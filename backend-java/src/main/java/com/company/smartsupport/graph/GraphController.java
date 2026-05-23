@@ -30,10 +30,19 @@ public class GraphController {
 
     @GetMapping
     public ApiResponse<PageResult<Map<String, Object>>> queryGraphAsset(
+            @RequestParam(required = false) String graphCategoryId,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) String relationType,
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize) {
         requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphAssets(pageNo, pageSize));
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphAssets(graphCategoryId, entityType, relationType, pageNo, pageSize));
+    }
+
+    @GetMapping("/categories")
+    public ApiResponse<Map<String, Object>> categories() {
+        requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphCategories());
     }
 
     @GetMapping("/{graphId}")

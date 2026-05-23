@@ -133,6 +133,8 @@ public class MockSupportService {
                 "sourceId", sourceId,
                 "projectId", projectId,
                 "sourceType", sourceType,
+                "graphCategoryId", body.getOrDefault("graphCategoryId", "device-alarm"),
+                "graphCategoryName", body.getOrDefault("graphCategoryName", "设备与告警"),
                 "fileName", body.getOrDefault("fileName", sourceType.equals("text") ? "raw-text.txt" : "upload." + sourceType),
                 "status", "graph_ready",
                 "parserStatus", "success",
@@ -142,6 +144,7 @@ public class MockSupportService {
             aiServiceClient.ingestKnowledge(mapOf(
                 "sourceId", sourceId,
                 "sourceType", sourceType,
+                "graphCategoryId", source.get("graphCategoryId"),
                 "rawText", body.get("rawText"),
                 "projectId", projectId)).ifPresent(result -> {
                     source.put("parserStatus", result.getOrDefault("parserStatus", source.get("parserStatus")));
@@ -170,19 +173,49 @@ public class MockSupportService {
         return mapOf("sourceId", sourceId, "taskId", uuid(), "status", "running", "progress", 0);
     }
 
-    public PageResult<Map<String, Object>> graphAssets(int pageNo, int pageSize) {
-        Map<String, Object> aiGraphs = aiServiceClient.queryGraphs(mapOf("projectId", "P001", "keyword", "alarm")).orElse(Map.of());
-        Object aiItems = aiGraphs.get("items");
-        if (aiItems instanceof List<?> list && !list.isEmpty()) {
-            return PageResult.of(castList(list), pageNo, pageSize);
-        }
-        List<Map<String, Object>> items = List.of(
-                mapOf("graphId", "graph-device-alarm", "graphName", "设备告警关系子图", "nodes", List.of(mapOf("id", "device:TC-003", "label", "设备 TC-003"), mapOf("id", "rule:AR-17", "label", "告警规则 AR-17")), "edges", List.of(mapOf("source", "device:TC-003", "target", "rule:AR-17", "type", "BOUND_TO")), "sourceRefs", List.of("knowledge:alarm-rule-doc"), "confidence", 0.89, "activeRevisionId", "rev-3"));
+    public Map<String, Object> graphCategories() {
+        return mapOf(
+                "categories", graphCategoryItems(),
+                "entityTypes", List.of(
+                        mapOf("type", "region", "label", "地区", "group", "space"),
+                        mapOf("type", "vessel", "label", "船舶", "group", "asset"),
+                        mapOf("type", "crew", "label", "船员", "group", "people"),
+                        mapOf("type", "device", "label", "设备", "group", "asset"),
+                        mapOf("type", "deviceType", "label", "设备类型", "group", "taxonomy"),
+                        mapOf("type", "alarm", "label", "告警", "group", "event"),
+                        mapOf("type", "protocol", "label", "协议", "group", "integration"),
+                        mapOf("type", "alarmRule", "label", "告警规则", "group", "rule"),
+                        mapOf("type", "system", "label", "系统", "group", "system")),
+                "relationTypes", List.of(
+                        mapOf("type", "LOCATED_IN", "label", "归属地区", "from", "vessel", "to", "region"),
+                        mapOf("type", "CREW_ON", "label", "船员任职", "from", "crew", "to", "vessel"),
+                        mapOf("type", "INSTALLED_ON", "label", "设备安装于船舶", "from", "device", "to", "vessel"),
+                        mapOf("type", "HAS_DEVICE_TYPE", "label", "设备类型", "from", "device", "to", "deviceType"),
+                        mapOf("type", "RAISED_BY", "label", "告警来源设备", "from", "alarm", "to", "device"),
+                        mapOf("type", "USES_PROTOCOL", "label", "设备协议", "from", "device", "to", "protocol"),
+                        mapOf("type", "BOUND_TO", "label", "规则绑定", "from", "device", "to", "alarmRule")));
+    }
+
+    public PageResult<Map<String, Object>> graphAssets(String graphCategoryId, String entityType, String relationType, int pageNo, int pageSize) {
+        List<Map<String, Object>> items = graphAssetItems().stream()
+                .filter(item -> !StringUtils.hasText(graphCategoryId) || graphCategoryId.equals(item.get("graphCategoryId")))
+                .filter(item -> !StringUtils.hasText(entityType) || graphContainsEntityType(item, entityType))
+                .filter(item -> !StringUtils.hasText(relationType) || graphContainsRelationType(item, relationType))
+                .toList();
         return PageResult.of(items, pageNo, pageSize);
     }
 
     public Map<String, Object> graphAssetDetail(String graphId) {
-        return mapOf("graphId", graphId, "graphName", "设备告警关系子图", "status", "published", "neo4jGraphRef", "neo4j://graph/" + graphId, "sourceRefs", List.of("knowledge:alarm-rule-doc"), "revisions", List.of(mapOf("revisionId", "rev-3", "status", "published")), "activeRevisionId", "rev-3");
+        return graphAssetItems().stream()
+                .filter(item -> graphId.equals(item.get("graphId")))
+                .findFirst()
+                .map(item -> {
+                    Map<String, Object> detail = new LinkedHashMap<>(item);
+                    detail.put("neo4jGraphRef", "neo4j://graph/" + graphId);
+                    detail.put("revisions", List.of(mapOf("revisionId", detail.get("activeRevisionId"), "status", "published")));
+                    return detail;
+                })
+                .orElseGet(() -> mapOf("graphId", graphId, "graphName", "未知子图", "status", "draft", "nodes", List.of(), "edges", List.of(), "revisions", List.of()));
     }
 
     public Map<String, Object> updateGraphDraft(String graphId, Map<String, Object> body) {
@@ -193,6 +226,117 @@ public class MockSupportService {
         String action = stringValue(body, "action");
         return mapOf("graphId", graphId, "graphStatus", "rollback".equals(action) ? "rolled_back" : "published", "activeVersion", body.getOrDefault("targetVersion", "rev-3"));
     }
+
+        private List<Map<String, Object>> graphCategoryItems() {
+        return List.of(
+            mapOf("categoryId", "geo-vessel", "categoryName", "地区与船舶", "domain", "asset", "description", "片区、港区、船舶归属和调度范围"),
+            mapOf("categoryId", "vessel-crew", "categoryName", "船舶与船员", "domain", "people", "description", "船舶、船员、岗位和当班关系"),
+            mapOf("categoryId", "vessel-device", "categoryName", "船舶与设备绑定", "domain", "asset", "description", "船舶上的设备安装、拆换和绑定关系"),
+            mapOf("categoryId", "device-alarm", "categoryName", "设备与告警", "domain", "event", "description", "告警来源设备、告警规则和阈值关系"),
+            mapOf("categoryId", "device-protocol", "categoryName", "设备与协议", "domain", "integration", "description", "设备类型、接入协议、字段映射和采集来源"));
+        }
+
+        private List<Map<String, Object>> graphAssetItems() {
+        return List.of(
+            mapOf(
+                "graphId", "graph-region-vessel",
+                "graphName", "华东片区船舶关系图",
+                "graphCategoryId", "geo-vessel",
+                "graphCategoryName", "地区与船舶",
+                "status", "published",
+                "nodes", List.of(
+                    mapOf("id", "region:east", "label", "华东片区", "type", "region"),
+                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
+                    mapOf("id", "vessel:MINX-002", "label", "民星 002", "type", "vessel")),
+                "edges", List.of(
+                    mapOf("source", "vessel:MINX-001", "target", "region:east", "type", "LOCATED_IN"),
+                    mapOf("source", "vessel:MINX-002", "target", "region:east", "type", "LOCATED_IN")),
+                "sourceRefs", List.of("knowledge:vessel-registry"),
+                "confidence", 0.93,
+                "activeRevisionId", "rev-region-4"),
+            mapOf(
+                "graphId", "graph-vessel-crew",
+                "graphName", "船舶船员任职关系图",
+                "graphCategoryId", "vessel-crew",
+                "graphCategoryName", "船舶与船员",
+                "status", "published",
+                "nodes", List.of(
+                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
+                    mapOf("id", "crew:ZHANGSAN", "label", "张三 船长", "type", "crew"),
+                    mapOf("id", "crew:LISI", "label", "李四 轮机员", "type", "crew")),
+                "edges", List.of(
+                    mapOf("source", "crew:ZHANGSAN", "target", "vessel:MINX-001", "type", "CREW_ON"),
+                    mapOf("source", "crew:LISI", "target", "vessel:MINX-001", "type", "CREW_ON")),
+                "sourceRefs", List.of("knowledge:crew-duty-roster"),
+                "confidence", 0.88,
+                "activeRevisionId", "rev-crew-2"),
+            mapOf(
+                "graphId", "graph-vessel-device",
+                "graphName", "船舶设备绑定关系图",
+                "graphCategoryId", "vessel-device",
+                "graphCategoryName", "船舶与设备绑定",
+                "status", "published",
+                "nodes", List.of(
+                    mapOf("id", "vessel:MINX-001", "label", "民星 001", "type", "vessel"),
+                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
+                    mapOf("id", "deviceType:temperature", "label", "温度采集器", "type", "deviceType")),
+                "edges", List.of(
+                    mapOf("source", "device:TC-003", "target", "vessel:MINX-001", "type", "INSTALLED_ON"),
+                    mapOf("source", "device:TC-003", "target", "deviceType:temperature", "type", "HAS_DEVICE_TYPE")),
+                "sourceRefs", List.of("knowledge:device-binding-sheet"),
+                "confidence", 0.91,
+                "activeRevisionId", "rev-device-7"),
+            mapOf(
+                "graphId", "graph-device-alarm",
+                "graphName", "设备告警关系子图",
+                "graphCategoryId", "device-alarm",
+                "graphCategoryName", "设备与告警",
+                "status", "published",
+                "nodes", List.of(
+                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
+                    mapOf("id", "alarm:OVERLOAD", "label", "超载告警", "type", "alarm"),
+                    mapOf("id", "rule:AR-17", "label", "告警规则 AR-17", "type", "alarmRule")),
+                "edges", List.of(
+                    mapOf("source", "alarm:OVERLOAD", "target", "device:TC-003", "type", "RAISED_BY"),
+                    mapOf("source", "device:TC-003", "target", "rule:AR-17", "type", "BOUND_TO")),
+                "sourceRefs", List.of("knowledge:alarm-rule-doc"),
+                "confidence", 0.89,
+                "activeRevisionId", "rev-3"),
+            mapOf(
+                "graphId", "graph-device-protocol",
+                "graphName", "设备协议接入关系图",
+                "graphCategoryId", "device-protocol",
+                "graphCategoryName", "设备与协议",
+                "status", "draft",
+                "nodes", List.of(
+                    mapOf("id", "device:TC-003", "label", "设备 TC-003", "type", "device"),
+                    mapOf("id", "deviceType:temperature", "label", "温度采集器", "type", "deviceType"),
+                    mapOf("id", "protocol:MQTT-JSON", "label", "MQTT JSON 协议", "type", "protocol")),
+                "edges", List.of(
+                    mapOf("source", "device:TC-003", "target", "protocol:MQTT-JSON", "type", "USES_PROTOCOL"),
+                    mapOf("source", "device:TC-003", "target", "deviceType:temperature", "type", "HAS_DEVICE_TYPE")),
+                "sourceRefs", List.of("knowledge:device-protocol-spec"),
+                "confidence", 0.84,
+                "activeRevisionId", "draft-protocol-1"));
+        }
+
+        @SuppressWarnings("unchecked")
+        private boolean graphContainsEntityType(Map<String, Object> graph, String entityType) {
+        Object nodes = graph.get("nodes");
+        if (!(nodes instanceof List<?> list)) {
+            return false;
+        }
+        return ((List<Map<String, Object>>) list).stream().anyMatch(node -> entityType.equals(node.get("type")));
+        }
+
+        @SuppressWarnings("unchecked")
+        private boolean graphContainsRelationType(Map<String, Object> graph, String relationType) {
+        Object edges = graph.get("edges");
+        if (!(edges instanceof List<?> list)) {
+            return false;
+        }
+        return ((List<Map<String, Object>>) list).stream().anyMatch(edge -> relationType.equals(edge.get("type")));
+        }
 
     public PageResult<Map<String, Object>> capabilities(int pageNo, int pageSize) {
         mcpServerClient.tools().ifPresent(tools -> {

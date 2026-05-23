@@ -21,8 +21,14 @@ interface GraphEdgePayload {
 interface GraphPayload {
   graphId?: string;
   graphName?: string;
+  graphCategoryName?: string;
   nodes?: GraphNodePayload[];
   edges?: GraphEdgePayload[];
+}
+
+interface GraphTypeOption {
+  type?: string;
+  label?: string;
 }
 
 type FlowNode = Node;
@@ -30,6 +36,8 @@ type FlowEdge = Edge;
 
 const props = defineProps<{
   graph: GraphPayload | null;
+  entityTypes?: GraphTypeOption[];
+  relationTypes?: GraphTypeOption[];
 }>();
 
 const emit = defineEmits<{
@@ -47,6 +55,17 @@ const relationTarget = ref('');
 const relationType = ref('RELATED_TO');
 
 const graphId = computed(() => props.graph?.graphId || 'draft-graph');
+const entityTypeOptions = computed(() => props.entityTypes?.length ? props.entityTypes : [
+  { label: '设备', type: 'device' },
+  { label: '告警规则', type: 'alarmRule' },
+  { label: '船舶', type: 'vessel' },
+  { label: '配置', type: 'config' },
+  { label: '系统', type: 'system' }
+]);
+const relationTypeOptions = computed(() => props.relationTypes?.length ? props.relationTypes : [
+  { label: '关联', type: 'RELATED_TO' },
+  { label: '绑定', type: 'BOUND_TO' }
+]);
 
 const sourceOptions = computed<{ id: string; label: string }[]>(() => {
   return nodes.value.map((node) => ({ id: String(node.id), label: String(node.data?.label || node.id) }));
@@ -197,7 +216,7 @@ watch(
     <div class="graph-toolbar">
       <div class="graph-meta">
         <strong>{{ graph?.graphName || '关系子图' }}</strong>
-        <span>{{ nodes.length }} 个实体 / {{ edges.length }} 条关系</span>
+        <span>{{ graph?.graphCategoryName || '未分类图谱' }} · {{ nodes.length }} 个实体 / {{ edges.length }} 条关系</span>
       </div>
       <div class="graph-actions">
         <el-button @click="deleteSelectedEntity" :disabled="!selectedNodeId">删除实体</el-button>
@@ -221,11 +240,7 @@ watch(
           <strong>新增实体</strong>
           <el-input v-model="entityLabel" placeholder="实体名称，如 设备 TC-003" />
           <el-select v-model="entityType" placeholder="实体类型">
-            <el-option label="设备" value="device" />
-            <el-option label="告警规则" value="alarmRule" />
-            <el-option label="船舶" value="vessel" />
-            <el-option label="配置" value="config" />
-            <el-option label="系统" value="system" />
+            <el-option v-for="item in entityTypeOptions" :key="item.type" :label="item.label || item.type" :value="item.type" />
           </el-select>
           <el-button type="primary" plain @click="addEntity">添加实体</el-button>
         </div>
@@ -235,7 +250,9 @@ watch(
           <el-select v-model="relationSource" filterable placeholder="起点实体">
             <el-option v-for="item in sourceOptions" :key="item.id" :label="item.label" :value="item.id" />
           </el-select>
-          <el-input v-model="relationType" placeholder="关系类型，如 BOUND_TO" />
+          <el-select v-model="relationType" filterable allow-create placeholder="关系类型，如 BOUND_TO">
+            <el-option v-for="item in relationTypeOptions" :key="item.type" :label="item.label || item.type" :value="item.type" />
+          </el-select>
           <el-select v-model="relationTarget" filterable placeholder="终点实体">
             <el-option v-for="item in sourceOptions" :key="item.id" :label="item.label" :value="item.id" />
           </el-select>

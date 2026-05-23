@@ -25,6 +25,7 @@
 | API-010 | createKnowledgeSource | POST | `/api/v1/knowledge/sources` | `knowledge:upload` | P0 |
 | API-011 | getKnowledgeIngestionTask | GET | `/api/v1/knowledge/sources/{sourceId}/tasks` | `knowledge:view` | P0 |
 | API-012 | queryGraphAsset | GET | `/api/v1/graphs/assets` | `graph:view` | P0 |
+| API-012A | listGraphCategories | GET | `/api/v1/graphs/assets/categories` | `graph:view` | P0 |
 | API-013 | updateGraphAssetDraft | PATCH | `/api/v1/graphs/assets/{graphId}/draft` | `graph:edit` | P0 |
 | API-014 | publishOrRollbackGraph | POST | `/api/v1/graphs/assets/{graphId}/versions/actions` | `graph:publish` / `graph:rollback` | P0 |
 | API-015 | listMcpCapabilities | GET | `/api/v1/mcp/capabilities` | `mcp:view` | P0 |
@@ -171,9 +172,9 @@ Path：`traceId`；Query：`includeSteps`、`includeMcpCalls`、`includeRawRef`�
 - Content-Type：`multipart/form-data` 或 `application/json`。
 - 事务边界：创建 `knowledge_source` 和首个 `knowledge_ingestion_task`。
 
-请求字段：`sourceType`、`file`、`rawText`、`sensitivityLevel`。
+请求字段：`sourceType`、`file`、`rawText`、`graphCategoryId`、`graphCategoryName`、`sensitivityLevel`。
 
-成功响应 data：`sourceId`、`status`、`parserStatus`、`extractStatus`、`graphBuildStatus`。
+成功响应 data：`sourceId`、`status`、`parserStatus`、`extractStatus`、`graphBuildStatus`、`graphCategoryId`。
 
 错误码：`ICSS-KNOW-400-UNSUPPORTED_SOURCE_TYPE`、`ICSS-KNOW-413-FILE_TOO_LARGE`、`ICSS-KNOW-409-SOURCE_DUPLICATED`。
 
@@ -200,11 +201,24 @@ Path：`sourceId`；Query：`taskType`、`status`、`pageNo`、`pageSize`。
 - 分页：统一分页。
 - 字段映射：`graphId -> graph_asset.graph_id`，`sourceRefs -> graph_asset.source_refs`，`version -> graph_revision.revision_no`。
 
-Query：`keyword`、`entityType`、`relationType`、`version`、`pageNo`、`pageSize`。
+Query：`keyword`、`graphCategoryId`、`entityType`、`relationType`、`version`、`pageNo`、`pageSize`。
 
-成功响应 data.items：`graphId`、`nodes`、`edges`、`sourceRefs`、`confidence`、`activeRevisionId`。
+成功响应 data.items：`graphId`、`graphName`、`graphCategoryId`、`graphCategoryName`、`nodes`、`edges`、`sourceRefs`、`confidence`、`activeRevisionId`。
 
 错误码：`ICSS-GRAPH-400-INVALID_QUERY`、`ICSS-GRAPH-404-ASSET_NOT_FOUND`。
+
+### API-012A listGraphCategories
+
+- 业务说明：查询图谱动态分类体系、实体类型和关系类型，供录入预览与历史维护页面动态渲染筛选项和编辑选项。
+- 关联功能：M7-F1、M8-F1。
+- 鉴权：`graph:view`。
+- 字段映射：`graphCategoryId -> graph_asset.graph_category_id / knowledge_source.graph_category_id`，`entityTypes -> graph_asset.entity_types`，`relationTypes -> graph_asset.relation_types`。
+
+成功响应 data：`categories`、`entityTypes`、`relationTypes`。
+
+首批分类：`geo-vessel` 地区与船舶、`vessel-crew` 船舶与船员、`vessel-device` 船舶与设备绑定、`device-alarm` 设备与告警、`device-protocol` 设备与协议。
+
+错误码：`ICSS-GRAPH-400-INVALID_QUERY`。
 
 ### API-013 updateGraphAssetDraft
 
@@ -214,7 +228,7 @@ Query：`keyword`、`entityType`、`relationType`、`version`、`pageNo`、`page
 - 幂等：必填 `X-Idempotency-Key`。
 - 事务边界：更新 `graph_asset` 草稿元数据，新增或更新 `graph_revision`，写入 `audit_log`。
 
-请求 Body：`nodeChanges`、`edgeChanges`、`editReason`、`baseRevisionId`。
+请求 Body：`nodeChanges`、`edgeChanges`、`nodes`、`edges`、`graphCategoryId`、`editReason`、`baseRevisionId`。
 
 成功响应 data：`graphId`、`draftVersion`、`status`。
 
@@ -317,8 +331,8 @@ Query：`category`、`enabled/status`、`riskLevel`、`keyword`、`pageNo`、`pa
 | M4-F1 审批执行 | API-005、API-006、API-007，V0.1 暂缓 |
 | M5-F1 知识案例沉淀 | API-008，P1 占位 |
 | M6-F1 系统执行日志 | API-009 |
-| M7-F1 知识图谱查看与维护 | API-012、API-013、API-014 |
-| M8-F1 多类型知识库录入 | API-010、API-011 |
+| M7-F1 知识图谱查看与维护 | API-012、API-012A、API-013、API-014 |
+| M8-F1 多类型知识库录入 | API-010、API-011、API-012A |
 | M9-F1 MCP 能力管理 | API-015、API-016、API-017 |
 | M10-F1 诊断路径固化与重建 | API-018、API-019 |
 
@@ -330,7 +344,7 @@ Query：`category`、`enabled/status`、`riskLevel`、`keyword`、`pageNo`、`pa
 | API-003、API-004 | support_session、diagnostic_case、execution_trace |
 | API-009 | execution_trace、execution_trace_step、mcp_call_log |
 | API-010、API-011 | knowledge_source、knowledge_ingestion_task |
-| API-012、API-013、API-014 | graph_asset、graph_revision、graph_build_batch、audit_log |
+| API-012、API-012A、API-013、API-014 | graph_asset、graph_revision、graph_build_batch、audit_log |
 | API-015、API-016 | mcp_capability、mcp_capability_status_log、audit_log |
 | API-017 | route_template.mcp_plan 或后续 mapping 表 |
 | API-018、API-019 | route_template、route_evaluation、audit_log |

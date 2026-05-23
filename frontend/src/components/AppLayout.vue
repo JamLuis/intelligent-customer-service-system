@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useRoute } from 'vue-router';
-import { BotMessageSquare, BookOpen, GitPullRequest, PlugZap, Settings } from 'lucide-vue-next';
+import { BotMessageSquare, GitBranch, GitPullRequest, PlugZap, Settings, UploadCloud } from 'lucide-vue-next';
 import type { RuntimeConfig } from '../api';
 
 const runtime = reactive<RuntimeConfig>({ token: 'mock-token', projectId: 'P001' });
@@ -31,9 +31,13 @@ const activeMenu = computed(() => String(route.name || 'chat'));
             <el-icon><Settings /></el-icon>
             <span>后台管理</span>
           </template>
-          <el-menu-item index="admin-knowledge" route="/admin/knowledge">
-            <el-icon><BookOpen /></el-icon>
-            <span>知识库与图谱</span>
+          <el-menu-item index="admin-knowledge-ingest" route="/admin/knowledge/ingest">
+            <el-icon><UploadCloud /></el-icon>
+            <span>知识录入与预览</span>
+          </el-menu-item>
+          <el-menu-item index="admin-graph-maintenance" route="/admin/knowledge/graphs">
+            <el-icon><GitBranch /></el-icon>
+            <span>历史图谱维护</span>
           </el-menu-item>
           <el-menu-item index="admin-tickets" route="/admin/tickets">
             <el-icon><GitPullRequest /></el-icon>
