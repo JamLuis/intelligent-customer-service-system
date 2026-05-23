@@ -109,12 +109,16 @@ export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.x
 ./scripts/start-all.sh start
 ```
 
+`start` 会等待 Java 主后台、Python AI Service、Node MCP Server 和前端 Vite 都完成 HTTP ready 后再返回；如果服务在超时时间内未就绪，会提示对应日志路径。
+
 查看状态或停止：
 
 ```bash
 ./scripts/start-all.sh status
 ./scripts/start-all.sh stop
 ```
+
+`status` 会同时显示进程 PID 和 HTTP ready 状态，避免只看到 PID 存在但端口尚未监听。
 
 只验证数据库、Neo4j 和 Redis，不启动应用服务，验证完成后自动关闭容器：
 

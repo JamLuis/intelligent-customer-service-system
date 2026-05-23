@@ -11,6 +11,7 @@ MCP_PORT="${MCP_PORT:-3202}"
 BACKEND_PORT="${BACKEND_PORT:-8088}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
+STARTUP_TIMEOUT_SECONDS="${STARTUP_TIMEOUT_SECONDS:-90}"
 MAVEN_SETTINGS="${MAVEN_SETTINGS:-$ROOT_DIR/../app-ship-alarm/settings.xml}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$ROOT_DIR/.env}"
 BACKEND_JAR="$ROOT_DIR/backend-java/target/backend-java-0.1.0-SNAPSHOT.jar"
@@ -122,6 +123,46 @@ stop_port_process() {
   fi
 }
 
+http_ready() {
+  local url="$1"
+  curl -fsS --max-time 2 "$url" >/dev/null 2>&1
+}
+
+wait_http() {
+  local name="$1"
+  local url="$2"
+  local deadline
+  deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
+
+  log "waiting for $name: $url"
+  until http_ready "$url"; do
+    if (( SECONDS >= deadline )); then
+      log "$name did not become ready within ${STARTUP_TIMEOUT_SECONDS}s"
+      log "check log: $LOG_DIR/$name.log"
+      return 1
+    fi
+    sleep 1
+  done
+  log "$name ready: $url"
+}
+
+service_status() {
+  local name="$1"
+  local url="$2"
+  local file
+  file="$(pid_file "$name")"
+
+  if is_running "$file"; then
+    if http_ready "$url"; then
+      log "$name running, pid $(cat "$file"), http ready"
+    else
+      log "$name running, pid $(cat "$file"), http not ready"
+    fi
+  else
+    log "$name stopped"
+  fi
+}
+
 install_node_dependencies() {
   require_command npm
   local node_dir
@@ -179,6 +220,7 @@ stop_infra() {
 
 start_all() {
   require_command mvn
+  require_command curl
   install_node_dependencies
   install_python_dependencies
   start_infra
@@ -211,6 +253,13 @@ start_all() {
     log "frontend/package.json not found, skip frontend"
   fi
 
+  wait_http "mcp-server-node" "http://127.0.0.1:$MCP_PORT/health"
+  wait_http "ai-service-python" "http://127.0.0.1:$AI_PORT/health"
+  wait_http "backend-java" "http://127.0.0.1:$BACKEND_PORT/api/health"
+  if [[ -f "$ROOT_DIR/frontend/package.json" ]]; then
+    wait_http "frontend" "http://127.0.0.1:$FRONTEND_PORT/"
+  fi
+
   log "started services"
   log "frontend: http://localhost:$FRONTEND_PORT"
   log "backend: http://localhost:$BACKEND_PORT/api/health"
@@ -240,15 +289,10 @@ status_all() {
     fi
   fi
 
-  for name in frontend backend-java ai-service-python mcp-server-node; do
-    local file
-    file="$(pid_file "$name")"
-    if is_running "$file"; then
-      log "$name running, pid $(cat "$file")"
-    else
-      log "$name stopped"
-    fi
-  done
+  service_status "frontend" "http://127.0.0.1:$FRONTEND_PORT/"
+  service_status "backend-java" "http://127.0.0.1:$BACKEND_PORT/api/health"
+  service_status "ai-service-python" "http://127.0.0.1:$AI_PORT/health"
+  service_status "mcp-server-node" "http://127.0.0.1:$MCP_PORT/health"
 }
 
 case "${1:-start}" in
