@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: smart-support-backend-java
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/smart_support}
+    username: ${SPRING_DATASOURCE_USERNAME:smart_support}
+    password: ${SPRING_DATASOURCE_PASSWORD:smart_support}
+    driver-class-name: org.postgresql.Driver
 
 management:
   endpoints:

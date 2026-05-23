@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.company.smartsupport.common.ApiResponse;
 import com.company.smartsupport.common.PageResult;
 import com.company.smartsupport.common.RequestContext;
+import com.company.smartsupport.graph.dto.GraphAssetDetailDto;
+import com.company.smartsupport.graph.dto.GraphAssetSummaryDto;
+import com.company.smartsupport.graph.dto.GraphTaxonomyResponse;
 import com.company.smartsupport.mock.MockSupportService;
 
 @RestController
@@ -22,33 +25,43 @@ public class GraphController {
 
     private final MockSupportService mockSupportService;
     private final RequestContext requestContext;
+    private final GraphTaxonomyService graphTaxonomyService;
+    private final GraphAssetService graphAssetService;
 
-    public GraphController(MockSupportService mockSupportService, RequestContext requestContext) {
+    public GraphController(
+            MockSupportService mockSupportService,
+            RequestContext requestContext,
+            GraphTaxonomyService graphTaxonomyService,
+            GraphAssetService graphAssetService) {
         this.mockSupportService = mockSupportService;
         this.requestContext = requestContext;
+        this.graphTaxonomyService = graphTaxonomyService;
+        this.graphAssetService = graphAssetService;
     }
 
     @GetMapping
-    public ApiResponse<PageResult<Map<String, Object>>> queryGraphAsset(
+    public ApiResponse<PageResult<GraphAssetSummaryDto>> queryGraphAsset(
             @RequestParam(required = false) String graphCategoryId,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) String relationType,
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize) {
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphAssets(graphCategoryId, entityType, relationType, pageNo, pageSize));
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(
+                requestContext.requestId(),
+                graphAssetService.queryGraphAssets(projectId, graphCategoryId, entityType, relationType, pageNo, pageSize));
     }
 
     @GetMapping("/categories")
-    public ApiResponse<Map<String, Object>> categories() {
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphCategories());
+    public ApiResponse<GraphTaxonomyResponse> categories() {
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), graphTaxonomyService.getTaxonomy(projectId));
     }
 
     @GetMapping("/{graphId}")
-    public ApiResponse<Map<String, Object>> detail(@PathVariable String graphId) {
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.graphAssetDetail(graphId));
+    public ApiResponse<GraphAssetDetailDto> detail(@PathVariable String graphId) {
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), graphAssetService.getGraphAsset(projectId, graphId));
     }
 
     @PatchMapping("/{graphId}/draft")

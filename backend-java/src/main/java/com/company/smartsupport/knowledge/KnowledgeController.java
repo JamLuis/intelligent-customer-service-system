@@ -13,6 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.company.smartsupport.common.ApiResponse;
 import com.company.smartsupport.common.PageResult;
 import com.company.smartsupport.common.RequestContext;
+import com.company.smartsupport.knowledge.dto.KnowledgeBlockDto;
+import com.company.smartsupport.knowledge.dto.KnowledgeCandidatesResponse;
+import com.company.smartsupport.knowledge.dto.KnowledgeIngestionTaskDto;
+import com.company.smartsupport.knowledge.dto.KnowledgeSourceDto;
 import com.company.smartsupport.mock.MockSupportService;
 
 @RestController
@@ -21,40 +25,67 @@ public class KnowledgeController {
 
     private final MockSupportService mockSupportService;
     private final RequestContext requestContext;
+    private final KnowledgeSourceService knowledgeSourceService;
 
-    public KnowledgeController(MockSupportService mockSupportService, RequestContext requestContext) {
+    public KnowledgeController(
+            MockSupportService mockSupportService,
+            RequestContext requestContext,
+            KnowledgeSourceService knowledgeSourceService) {
         this.mockSupportService = mockSupportService;
         this.requestContext = requestContext;
+        this.knowledgeSourceService = knowledgeSourceService;
     }
 
     @PostMapping("/sources")
-    public ApiResponse<Map<String, Object>> createKnowledgeSource(@RequestBody Map<String, Object> body) {
+    public ApiResponse<KnowledgeSourceDto> createKnowledgeSource(@RequestBody Map<String, Object> body) {
         requestContext.requireIdempotencyKey();
         String projectId = requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.createKnowledgeSource(body, projectId));
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.createKnowledgeSource(body, projectId));
     }
 
     @GetMapping("/sources")
-    public ApiResponse<PageResult<Map<String, Object>>> listKnowledgeSources(
+    public ApiResponse<PageResult<KnowledgeSourceDto>> listKnowledgeSources(
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize) {
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.listKnowledgeSources(pageNo, pageSize));
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.listKnowledgeSources(projectId, pageNo, pageSize));
     }
 
     @GetMapping("/sources/{sourceId}/tasks")
-    public ApiResponse<PageResult<Map<String, Object>>> tasks(@PathVariable String sourceId,
+    public ApiResponse<PageResult<KnowledgeIngestionTaskDto>> tasks(@PathVariable String sourceId,
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize) {
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.ingestionTasks(sourceId, pageNo, pageSize));
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.listTasks(projectId, sourceId, pageNo, pageSize));
+    }
+
+    @GetMapping("/sources/{sourceId}/blocks")
+    public ApiResponse<PageResult<KnowledgeBlockDto>> blocks(
+            @PathVariable String sourceId,
+            @RequestParam(defaultValue = "1") int pageNo,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.listBlocks(projectId, sourceId, pageNo, pageSize));
+    }
+
+    @GetMapping("/sources/{sourceId}/candidates")
+    public ApiResponse<KnowledgeCandidatesResponse> candidates(@PathVariable String sourceId) {
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.getCandidates(projectId, sourceId));
+    }
+
+    @PostMapping("/sources/{sourceId}/actions")
+    public ApiResponse<KnowledgeIngestionTaskDto> actions(@PathVariable String sourceId, @RequestBody Map<String, Object> body) {
+        requestContext.requireIdempotencyKey();
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.createAction(projectId, sourceId, body));
     }
 
     @PostMapping("/sources/{sourceId}/retry")
-    public ApiResponse<Map<String, Object>> retry(@PathVariable String sourceId) {
+    public ApiResponse<KnowledgeIngestionTaskDto> retry(@PathVariable String sourceId) {
         requestContext.requireIdempotencyKey();
-        requestContext.requireProjectId();
-        return ApiResponse.success(requestContext.requestId(), mockSupportService.retryKnowledgeSource(sourceId));
+        String projectId = requestContext.requireProjectId();
+        return ApiResponse.success(requestContext.requestId(), knowledgeSourceService.retry(projectId, sourceId));
     }
 
     @PostMapping("/cases")
