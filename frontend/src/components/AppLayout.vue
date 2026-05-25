@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useRoute } from 'vue-router';
-import { BotMessageSquare, GitBranch, GitPullRequest, PlugZap, Settings, UploadCloud } from 'lucide-vue-next';
+import { BotMessageSquare, BrainCircuit, GitBranch, GitPullRequest, PlugZap, Settings, UploadCloud } from 'lucide-vue-next';
 import type { RuntimeConfig } from '../api';
 
 const runtime = reactive<RuntimeConfig>({ token: 'mock-token', projectId: 'P001' });
@@ -38,6 +38,10 @@ const activeMenu = computed(() => String(route.name || 'chat'));
           <el-menu-item index="admin-graph-maintenance" route="/admin/knowledge/graphs">
             <el-icon><GitBranch /></el-icon>
             <span>历史图谱维护</span>
+          </el-menu-item>
+          <el-menu-item index="admin-knowledge-model-config" route="/admin/knowledge/model-config">
+            <el-icon><BrainCircuit /></el-icon>
+            <span>模型配置</span>
           </el-menu-item>
           <el-menu-item index="admin-tickets" route="/admin/tickets">
             <el-icon><GitPullRequest /></el-icon>

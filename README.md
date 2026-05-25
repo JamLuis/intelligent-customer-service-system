@@ -8,7 +8,7 @@
 
 本系统的知识库不是传统的“把非结构化文件切成 chunk，生成 embedding 后存入向量库，再纯靠点积 / 余弦相似度判断是否相关”的方案。向量检索在本项目中只作为语义召回和证据补充手段，不作为最终关系判断依据。
 
-非结构化文件进入系统后，会先被解析为可追溯的文本块、表格块、OCR 块或配置块，再抽取候选实体和候选关系，经过实体归一、别名合并、关系类型校验、置信度评分、冲突检测和人工复核，最后写入 Neo4j 形成真实可查询的工程知识图谱。每个实体和关系都必须保留 source、block、页码 / 段落、版本、置信度和发布状态，确保诊断时可以查询关系路径，也可以回溯证据来源。
+非结构化文件进入系统后，用户无需预先选择业务分类；系统会先解析为可追溯的文本块、表格块、OCR 块或配置块，再抽取平台中立的候选实体和候选关系，经过实体归一、别名合并、关系类型校验、置信度评分、冲突检测、自动归类建议和人工复核，最后写入 Neo4j 形成真实可查询的工程知识图谱。每个实体和关系都必须保留 source、block、页码 / 段落、版本、置信度和发布状态，确保诊断时可以查询关系路径，也可以回溯证据来源。
 
 因此，本系统的核心能力是“可验证、可维护、可回滚、可关系检索”的工程知识图谱，而不是只基于 embedding 相似度的文本召回。
 
@@ -112,15 +112,87 @@ python3 -m venv ai-service-python/.venv
 ai-service-python/.venv/bin/python -m pip install -e ai-service-python
 ```
 
-Java 后端可使用仓库默认 Maven 配置；如需复用公司内网 settings，可设置：
+Java 后端默认使用本机 Maven 公共仓库配置，避免内网 Nexus 不通时启动长时间等待；如需复用公司内网 settings，可设置：
 
 ```bash
 export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.xml
 ```
 
+如果内网 Maven 仓库不可用，启动脚本会默认回退到 Maven 公共仓库继续打包；如需禁止回退，可设置 `MAVEN_SETTINGS_ALLOW_FALLBACK=0`。
+
+开放信息抽取默认走 OpenAI-compatible LLM 接口，可接云端大模型，也可接本地 vLLM / Ollama / LM Studio 等兼容服务：
+
+```bash
+export KNOWLEDGE_LLM_EXTRACT_ENABLED=true
+export LLM_API_BASE_URL=http://127.0.0.1:11434/v1
+export LLM_MODEL=qwen2.5:1.5b
+```
+
+`./scripts/start-all.sh start` 会默认启动本地 Ollama 服务并确保 `OLLAMA_MODEL` 存在，默认模型为 `qwen2.5:1.5b`。可通过环境变量调整：
+
+```bash
+export OLLAMA_ENABLED=1
+export OLLAMA_PORT=11434
+export OLLAMA_MODEL=qwen2.5:1.5b
+```
+
+后台模型配置页支持扫描本机模型：打开 `/admin/knowledge/model-config` 后点击“扫描本机模型”，系统会自动识别本机 Ollama、llama.cpp 和 LM Studio 暴露的模型。用户只需要选择模型并点击“一键使用选中模型”，系统会自动填入服务地址、模型名、运行时、Token 上限等参数，并完成保存、验证和启用。
+
+模型配置页已支持“自由选择 + 自动检查 + 运行时启动”：切换本地模型时会自动触发连接检查；当 Ollama 或 llama.cpp 显示“未启动”时，可直接点击“启动”按钮在配置页拉起对应本地服务（LM Studio 仍需手动从桌面应用启动）。
+
 ```bash
 ./scripts/start-all.sh start
 ```
+
+如果要单独启动 Gemma GGUF 模型，不和默认 Ollama `11434` 混用，推荐直接用 llama.cpp 启动 OpenAI-compatible 服务。该脚本默认读取：
+
+```text
+/Users/lucas/Work/Personal/llama.cpp-kleidiai/models/gemma-4-E4B-it-Q4_0.gguf
+```
+
+启动后会在 `11435` 暴露 OpenAI-compatible API，模型名为 `gemma-4-E4B-it-Q4_0`，可直接填到模型配置页的本地模型 Profile：
+
+```bash
+brew install llama.cpp
+
+./scripts/gemma-llamacpp.sh start
+./scripts/gemma-llamacpp.sh status
+./scripts/gemma-llamacpp.sh smoke
+./scripts/gemma-llamacpp.sh stop
+```
+
+如果已经有自行编译的 llama.cpp，可指定 server 路径：
+
+```bash
+export LLAMA_SERVER_BIN=/path/to/llama-server
+./scripts/gemma-llamacpp.sh start
+```
+
+也可以继续使用 Ollama 包装 GGUF，但它会先把 GGUF 注册成 Ollama model：
+
+```bash
+./scripts/gemma-ollama.sh start
+./scripts/gemma-ollama.sh status
+./scripts/gemma-ollama.sh smoke
+./scripts/gemma-ollama.sh stop
+```
+
+对应配置：
+
+```bash
+export LLM_API_BASE_URL=http://127.0.0.1:11435/v1
+export LLM_MODEL=gemma-4-E4B-it-Q4_0
+```
+
+如需改模型文件、端口或模型名，可设置：
+
+```bash
+export GEMMA_MODEL_PATH=/path/to/model.gguf
+export GEMMA_LLAMA_PORT=11435
+export GEMMA_LLAMA_MODEL=gemma-4-E4B-it-Q4_0
+```
+
+如果 `./scripts/gemma-llamacpp.sh start` 或 `./scripts/gemma-ollama.sh recreate` 提示 GGUF 文件过小，或报 `tensor ... offset+size exceeds file size`，说明本地 GGUF 大概率是未完整下载或已损坏，需要重新下载后再启动。
 
 `start` 会等待 Java 主后台、Python AI Service、Node MCP Server 和前端 Vite 都完成 HTTP ready 后再返回；如果服务在超时时间内未就绪，会提示对应日志路径。
 
@@ -156,8 +228,9 @@ export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.x
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
 | `/chat` | 用户诊断 | 提供专家模式与引导式客服模式，只保留聊天、执行过程、可能结果和可信度 |
-| `/admin/knowledge/ingest` | 知识录入与预览 | 按图谱分类录入结构化文本/非结构化文件，并预览入图结果 |
+| `/admin/knowledge/ingest` | 知识录入与预览 | 上传结构化文本/非结构化文件，系统自动解析、留证据并生成候选图谱；文本直连支持 txt/md/csv/json/ini/log/sql/ddl |
 | `/admin/knowledge/graphs` | 历史知识图谱维护 | 按动态图谱分类、实体类型、关系类型筛选和维护历史图谱 |
+| `/admin/knowledge/model-config` | 模型配置 | 对话问答与知识抽取模型独立配置，本地/云端参数互不覆盖 |
 | `/admin/tickets` | 问题工单 | 追溯用户问题、调用链和诊断结果 |
 | `/admin/mcp-tools` | MCP 工具库 | 查看 MCP 接口能力、启停状态、调用状态和影响范围 |
 

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS source_registry (
 \i /schema/08A/mcp_call_log.sql
 \i /schema/08A/knowledge_source.sql
 \i /schema/08A/knowledge_ingestion_task.sql
+\i /schema/08A/knowledge_model_config.sql
+\i /schema/08A/ai_model_profile.sql
 \i /schema/08A/graph_build_batch.sql
 \i /schema/08A/graph_asset.sql
 \i /schema/08A/graph_revision.sql

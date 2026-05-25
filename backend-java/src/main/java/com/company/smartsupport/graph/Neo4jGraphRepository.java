@@ -156,6 +156,34 @@ public class Neo4jGraphRepository {
                 Map.entry("properties", map(relation, "properties"))));
     }
 
+    public void deleteRelations(String projectId, java.util.List<String> relationIds) {
+        if (relationIds == null || relationIds.isEmpty()) {
+            return;
+        }
+        updateStatus("""
+                MATCH ()-[r:RELATION {tenantId:$tenantId, projectId:$projectId}]->()
+                WHERE r.relationId IN $relationIds
+                DELETE r
+                RETURN count(r) AS updated
+                """, Map.of("projectId", projectId, "relationIds", relationIds));
+    }
+
+    public void deleteGraphRevision(String projectId, String revisionId) {
+        if (revisionId == null || revisionId.isBlank()) {
+            return;
+        }
+        updateStatus("""
+                MATCH ()-[r:RELATION {tenantId:$tenantId, projectId:$projectId, revisionId:$revisionId}]->()
+                DELETE r
+                RETURN count(r) AS updated
+                """, Map.of("projectId", projectId, "revisionId", revisionId));
+        updateStatus("""
+                MATCH (e:KnowledgeEntity {tenantId:$tenantId, projectId:$projectId, revisionId:$revisionId})
+                DETACH DELETE e
+                RETURN count(e) AS updated
+                """, Map.of("projectId", projectId, "revisionId", revisionId));
+    }
+
     private Optional<String> findStatus(String cypher, Map<String, Object> params) {
         try (var session = driver.session(SessionConfig.forDatabase(database))) {
             var record = session.executeRead(tx -> tx.run(cypher, withTenant(params)).single());
@@ -208,6 +236,9 @@ public class Neo4jGraphRepository {
 
     private Object map(Map<String, Object> source, String key) {
         Object value = source.get(key);
-        return value instanceof Map<?, ?> ? value : Map.of();
+        if (value instanceof String text) {
+            return text;
+        }
+        return value == null ? "{}" : String.valueOf(value);
     }
 }

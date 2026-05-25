@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { CheckCircle2, CircleHelp, LoaderCircle, Send, Sparkles } from 'lucide-vue-next';
+import { CheckCircle2, CircleHelp, GitBranch, LoaderCircle, Send, Sparkles } from 'lucide-vue-next';
 import { api, setRuntimeConfig, type RuntimeConfig } from '../api';
 
 type ChatMode = 'expert' | 'guided';
@@ -29,10 +29,12 @@ const mode = ref<ChatMode>('guided');
 const expertPrompt = ref('');
 const guided = ref<GuidedContext>({ issue: '', region: '', targetObject: '', occurredDate: '', extra: '' });
 const loading = ref(false);
+const forceGraphGrounding = ref(true);
 const session = ref<Record<string, any> | null>(null);
 const diagnosis = ref<Record<string, any> | null>(null);
 const caseDetail = ref<Record<string, any> | null>(null);
 const trace = ref<Record<string, any> | null>(null);
+const knowledgeAnswer = ref<Record<string, any> | null>(null);
 
 const messages = ref<Message[]>([
   {
@@ -67,12 +69,22 @@ const executionSteps = computed(() => {
   if (Array.isArray(steps) && steps.length > 0) return steps;
   return [
     { stepName: '参数收集', status: session.value ? 'success' : 'waiting', outputSummary: session.value ? '已生成会话' : '等待输入' },
-    { stepName: '知识检索', status: diagnosis.value ? 'success' : 'waiting', outputSummary: diagnosis.value ? '已调用 AI Service' : '等待诊断' },
-    { stepName: 'MCP 取证', status: trace.value ? 'success' : 'waiting', outputSummary: trace.value ? '已返回工具证据' : '等待工具调用' }
+    { stepName: '知识检索', status: knowledgeAnswer.value ? 'success' : 'waiting', outputSummary: knowledgeAnswer.value ? '已检索知识库证据' : '等待检索' },
+    { stepName: '图谱约束', status: knowledgeAnswer.value ? 'success' : 'waiting', outputSummary: forceGraphGrounding.value ? '已启用关系图谱回答约束' : '未启用强约束' }
   ];
 });
 
 const results = computed(() => {
+  if (knowledgeAnswer.value) {
+    const confidence = Math.round(Number(knowledgeAnswer.value.confidence || 0) * 100);
+    return [
+      {
+        title: String(knowledgeAnswer.value.answer || ''),
+        confidence,
+        evidence: `证据 ${evidenceRefs.value.length} 条，${knowledgeAnswer.value.degraded ? '已降级' : '模型已回答'}`
+      }
+    ];
+  }
   if (!caseDetail.value) return [];
   const confidence = Number(caseDetail.value.confidenceScore || 0);
   return [
@@ -82,6 +94,14 @@ const results = computed(() => {
       evidence: '知识图谱路径、RAG 推理步骤、MCP 工具证据'
     }
   ];
+});
+
+const evidenceRefs = computed(() => {
+  const direct = knowledgeAnswer.value?.evidenceRefs;
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+  const retrieval = knowledgeAnswer.value?.retrieval as Record<string, any> | undefined;
+  const vectorEvidence = retrieval?.vectorEvidence;
+  return Array.isArray(vectorEvidence) ? vectorEvidence : [];
 });
 
 function append(role: Role, text: string) {
@@ -104,13 +124,16 @@ async function runDiagnosis() {
   diagnosis.value = null;
   caseDetail.value = null;
   trace.value = null;
+  knowledgeAnswer.value = null;
   try {
     append('user', questionText.value);
     session.value = await api.createSession({ questionText: questionText.value, projectId: props.runtime.projectId });
-    diagnosis.value = await api.startDiagnosis({ sessionId: session.value.sessionId, mockScenario: 'success' });
-    caseDetail.value = await api.getCase(String(diagnosis.value.caseId));
-    trace.value = await api.getTrace(String(diagnosis.value.traceId));
-    append('assistant', `已完成诊断，最高可信度 ${caseDetail.value.confidenceScore}%，请查看右侧结果列表。`);
+    knowledgeAnswer.value = await api.answerFromKnowledge({
+      questionText: questionText.value,
+      forceGraphGrounding: forceGraphGrounding.value,
+      limit: 8
+    });
+    append('assistant', String(knowledgeAnswer.value.answer || '知识库暂未返回答案'));
   } catch (error: any) {
     const message = error?.response?.data?.message || error?.message || '诊断失败';
     append('assistant', message);
@@ -126,6 +149,7 @@ async function runDiagnosis() {
     <div class="chat-main panel-surface">
       <div class="chat-mode-bar">
         <el-segmented v-model="mode" :options="[{ label: '引导式客服模式', value: 'guided' }, { label: '专家模式', value: 'expert' }]" />
+        <el-switch v-model="forceGraphGrounding" active-text="强制按关系图谱回答" inactive-text="允许普通证据摘要" />
       </div>
 
       <div class="message-list">
@@ -167,13 +191,25 @@ async function runDiagnosis() {
 
       <el-card shadow="never" class="panel-card">
         <template #header>
-          <div class="panel-title"><Sparkles :size="18" />可能结果</div>
+          <div class="panel-title"><Sparkles :size="18" />知识库回答</div>
         </template>
         <el-empty v-if="results.length === 0" description="完成诊断后显示结果" />
         <div v-for="item in results" v-else :key="item.title" class="result-item">
           <div class="result-title"><CheckCircle2 :size="16" />{{ item.title }}</div>
           <el-progress :percentage="item.confidence" :stroke-width="8" />
           <p>{{ item.evidence }}</p>
+        </div>
+      </el-card>
+
+      <el-card shadow="never" class="panel-card">
+        <template #header>
+          <div class="panel-title"><GitBranch :size="18" />知识库证据</div>
+        </template>
+        <el-empty v-if="evidenceRefs.length === 0" description="发送问题后显示命中的来源块和关系证据" />
+        <div v-for="(item, index) in evidenceRefs" v-else :key="String(item.blockId || index)" class="evidence-item">
+          <strong>{{ item.fileName || item.sourceFileName || item.sourceId || `证据 ${index + 1}` }}</strong>
+          <p>{{ item.quote || item.rawTextSummary || item.summary }}</p>
+          <el-tag size="small">{{ item.blockId || '-' }}</el-tag>
         </div>
       </el-card>
 

@@ -14,14 +14,17 @@ import com.company.smartsupport.knowledge.dto.KnowledgeSourceDto;
 public class KnowledgeSourceService {
 
     private final KnowledgeRepository knowledgeRepository;
+    private final KnowledgeIngestionPipeline ingestionPipeline;
 
-    public KnowledgeSourceService(KnowledgeRepository knowledgeRepository) {
+    public KnowledgeSourceService(KnowledgeRepository knowledgeRepository, KnowledgeIngestionPipeline ingestionPipeline) {
         this.knowledgeRepository = knowledgeRepository;
+        this.ingestionPipeline = ingestionPipeline;
     }
 
     public KnowledgeSourceDto createKnowledgeSource(Map<String, Object> body, String projectId) {
         KnowledgeSourceDto source = knowledgeRepository.createSource(body, projectId);
         knowledgeRepository.createTask(source.sourceId(), "parse");
+        ingestionPipeline.run(projectId, source.sourceId());
         return source;
     }
 
@@ -43,10 +46,16 @@ public class KnowledgeSourceService {
 
     public KnowledgeIngestionTaskDto createAction(String projectId, String sourceId, Map<String, Object> body) {
         Object action = body.get("action");
-        return knowledgeRepository.createActionTask(projectId, sourceId, action == null ? "" : String.valueOf(action));
+        KnowledgeIngestionTaskDto task = knowledgeRepository.createActionTask(projectId, sourceId, action == null ? "" : String.valueOf(action));
+        if ("parse".equals(task.taskType()) || "extract".equals(task.taskType()) || "graph_build".equals(task.taskType()) || "retry".equals(task.taskType())) {
+            ingestionPipeline.run(projectId, sourceId);
+        }
+        return task;
     }
 
     public KnowledgeIngestionTaskDto retry(String projectId, String sourceId) {
-        return knowledgeRepository.createActionTask(projectId, sourceId, "retry");
+        KnowledgeIngestionTaskDto task = knowledgeRepository.createActionTask(projectId, sourceId, "retry");
+        ingestionPipeline.run(projectId, sourceId);
+        return task;
     }
 }

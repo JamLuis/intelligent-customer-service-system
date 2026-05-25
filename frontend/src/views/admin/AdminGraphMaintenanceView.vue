@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
-import { Filter, GitBranch, Network } from 'lucide-vue-next';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Filter, GitBranch, Network, Trash2 } from 'lucide-vue-next';
 import { api, setRuntimeConfig, type RuntimeConfig } from '../../api';
 import BudgetBanner from '../../components/BudgetBanner.vue';
 import GraphEditor from '../../components/GraphEditor.vue';
@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const taxonomy = ref<Record<string, any> | null>(null);
 const graphs = ref<Record<string, any> | null>(null);
+const graphDetails = ref<Record<string, Record<string, any>>>({});
 const draftResult = ref<Record<string, any> | null>(null);
 const selectedCategoryId = ref('');
 const selectedEntityType = ref('');
@@ -24,7 +25,24 @@ const categories = computed<Record<string, any>[]>(() => Array.isArray(taxonomy.
 const entityTypes = computed<Record<string, any>[]>(() => Array.isArray(taxonomy.value?.entityTypes) ? taxonomy.value.entityTypes : []);
 const relationTypes = computed<Record<string, any>[]>(() => Array.isArray(taxonomy.value?.relationTypes) ? taxonomy.value.relationTypes : []);
 const graphItems = computed<Record<string, any>[]>(() => Array.isArray(graphs.value?.items) ? graphs.value.items : []);
-const activeGraph = computed(() => graphItems.value.find((item) => item.graphId === activeGraphId.value) || graphItems.value[0] || null);
+const activeGraph = computed(() => {
+  const summary = graphItems.value.find((item) => item.graphId === activeGraphId.value) || graphItems.value[0] || null;
+  if (!summary) {
+    return null;
+  }
+  return graphDetails.value[String(summary.graphId)] || summary;
+});
+const activeSources = computed<Record<string, any>[]>(() => Array.isArray(activeGraph.value?.sources) ? activeGraph.value.sources : []);
+const activeEvidenceBlocks = computed<Record<string, any>[]>(() => Array.isArray(activeGraph.value?.evidenceBlocks) ? activeGraph.value.evidenceBlocks : []);
+
+function optionValue(item: Record<string, any>, fallback: string) {
+  return String(item.type || item.entityType || item.relationType || item[fallback] || '');
+}
+
+function textPreview(value: unknown, maxLength = 360) {
+  const text = String(value || '').trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
 
 function syncRuntime() {
   setRuntimeConfig(props.runtime);
@@ -45,13 +63,29 @@ async function loadGraphs() {
       relationType: selectedRelationType.value || undefined,
       pageSize: 50
     });
+    const firstGraphId = String(graphItems.value[0]?.graphId || '');
+    if (firstGraphId) {
+      activeGraphId.value = firstGraphId;
+      await loadGraphDetail(firstGraphId);
+    }
   } finally {
     loading.value = false;
   }
 }
 
+async function loadGraphDetail(graphId: string) {
+  if (!graphId) {
+    return;
+  }
+  graphDetails.value = {
+    ...graphDetails.value,
+    [graphId]: await api.getGraph(graphId)
+  };
+}
+
 function selectGraph(graphId: string) {
   activeGraphId.value = graphId;
+  loadGraphDetail(graphId);
 }
 
 async function saveGraphDraft(payload: { graphId: string; nodes: unknown[]; edges: unknown[] }) {
@@ -65,6 +99,28 @@ async function saveGraphDraft(payload: { graphId: string; nodes: unknown[]; edge
       edges: payload.edges
     });
     ElMessage.success('历史图谱草稿已保存');
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function deleteGraphRecord(graph: Record<string, any>) {
+  const graphId = String(graph.graphId || '');
+  if (!graphId) {
+    return;
+  }
+  await ElMessageBox.confirm(`确定删除图谱记录「${graph.graphName || graphId}」吗？删除后该记录会从历史图谱中移除。`, '删除图谱记录', {
+    type: 'warning',
+    confirmButtonText: '删除',
+    cancelButtonText: '取消'
+  });
+  loading.value = true;
+  syncRuntime();
+  try {
+    draftResult.value = await api.deleteGraph(graphId);
+    delete graphDetails.value[graphId];
+    ElMessage.success('图谱记录已删除');
+    await loadGraphs();
   } finally {
     loading.value = false;
   }
@@ -96,6 +152,12 @@ watch(graphItems, (items) => {
   }
 });
 
+watch(activeGraphId, (graphId) => {
+  if (graphId) {
+    loadGraphDetail(graphId);
+  }
+});
+
 onMounted(async () => {
   await loadTaxonomy();
   await loadGraphs();
@@ -113,27 +175,29 @@ onMounted(async () => {
           <el-option v-for="item in categories" :key="item.categoryId" :label="item.categoryName" :value="item.categoryId" />
         </el-select>
         <el-select v-model="selectedEntityType" clearable filterable placeholder="实体类型">
-          <el-option v-for="item in entityTypes" :key="item.type" :label="item.label" :value="item.type" />
+          <el-option v-for="item in entityTypes" :key="optionValue(item, 'entityType')" :label="item.label || optionValue(item, 'entityType')" :value="optionValue(item, 'entityType')" />
         </el-select>
         <el-select v-model="selectedRelationType" clearable filterable placeholder="关系类型">
-          <el-option v-for="item in relationTypes" :key="item.type" :label="item.label" :value="item.type" />
+          <el-option v-for="item in relationTypes" :key="optionValue(item, 'relationType')" :label="item.label || optionValue(item, 'relationType')" :value="optionValue(item, 'relationType')" />
         </el-select>
         <el-button type="primary" @click="loadGraphs">查询图谱</el-button>
       </div>
 
       <div class="graph-category-list">
-        <button
+        <div
           v-for="item in graphItems"
           :key="item.graphId"
           class="graph-list-item"
           :class="{ active: item.graphId === activeGraphId }"
-          type="button"
           @click="selectGraph(item.graphId)"
         >
-          <strong>{{ item.graphName }}</strong>
-          <span>{{ item.graphCategoryName }} · {{ item.nodes?.length || 0 }} 实体 / {{ item.edges?.length || 0 }} 关系</span>
+          <div class="graph-list-item-head">
+            <strong>{{ item.graphName }}</strong>
+            <el-button :icon="Trash2" size="small" text type="danger" @click.stop="deleteGraphRecord(item)" />
+          </div>
+          <span>{{ item.graphCategoryName }} · {{ item.nodeCount ?? item.nodes?.length ?? 0 }} 实体 / {{ item.edgeCount ?? item.edges?.length ?? 0 }} 关系</span>
           <small>{{ item.status }} · {{ Math.round((item.confidence || 0) * 100) }}%</small>
-        </button>
+        </div>
       </div>
     </el-card>
 
@@ -160,6 +224,33 @@ onMounted(async () => {
         </div>
       </div>
       <BudgetBanner :budget-usage="activeGraph?.budgetUsage" :hybrid-scores="activeGraph?.vectorEvidence || activeGraph?.sourceEvidence" />
+      <div v-if="activeGraph" class="source-evidence-panel">
+        <div class="source-evidence-section">
+          <strong>关联源文件</strong>
+          <div v-if="activeSources.length" class="source-card-list">
+            <div v-for="item in activeSources" :key="item.sourceId" class="source-card">
+              <div class="source-card-head">
+                <span>{{ item.fileName || item.sourceId }}</span>
+                <el-tag size="small" effect="plain">{{ item.sourceType }}</el-tag>
+              </div>
+              <small>{{ item.sourceId }}</small>
+              <p v-if="item.objectKey">{{ item.objectKey }}</p>
+              <pre v-if="item.rawText">{{ textPreview(item.rawText) }}</pre>
+            </div>
+          </div>
+          <el-empty v-else description="暂无关联源文件" :image-size="48" />
+        </div>
+        <div class="source-evidence-section">
+          <strong>证据块</strong>
+          <div v-if="activeEvidenceBlocks.length" class="evidence-block-list">
+            <div v-for="item in activeEvidenceBlocks" :key="item.blockId" class="evidence-block-card">
+              <span>{{ item.blockType }} · page {{ item.pageNo || '-' }}</span>
+              <p>{{ item.normalizedText || item.rawText }}</p>
+            </div>
+          </div>
+          <el-empty v-else description="暂无证据块" :image-size="48" />
+        </div>
+      </div>
       <GraphEditor
         :graph="activeGraph"
         :entity-types="entityTypes"

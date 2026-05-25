@@ -10,10 +10,15 @@ AI_PORT="${AI_PORT:-8100}"
 MCP_PORT="${MCP_PORT:-3202}"
 BACKEND_PORT="${BACKEND_PORT:-8088}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+OLLAMA_ENABLED="${OLLAMA_ENABLED:-1}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:1.5b}"
 NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
 STARTUP_TIMEOUT_SECONDS="${STARTUP_TIMEOUT_SECONDS:-90}"
-MAVEN_SETTINGS="${MAVEN_SETTINGS:-$ROOT_DIR/../app-ship-alarm/settings.xml}"
+MAVEN_SETTINGS="${MAVEN_SETTINGS:-}"
+MAVEN_SETTINGS_ALLOW_FALLBACK="${MAVEN_SETTINGS_ALLOW_FALLBACK:-1}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$ROOT_DIR/.env}"
+APPLY_NEO4J_SCHEMA="${APPLY_NEO4J_SCHEMA:-0}"
 BACKEND_JAR="$ROOT_DIR/backend-java/target/backend-java-0.1.0-SNAPSHOT.jar"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
@@ -146,6 +151,56 @@ wait_http() {
   log "$name ready: $url"
 }
 
+ollama_base_url() {
+  printf 'http://127.0.0.1:%s' "$OLLAMA_PORT"
+}
+
+ollama_ready() {
+  http_ready "$(ollama_base_url)/api/tags"
+}
+
+ollama_has_model() {
+  curl -fsS --max-time 5 "$(ollama_base_url)/api/tags" 2>/dev/null | grep -q "\"name\":\"$OLLAMA_MODEL\""
+}
+
+start_ollama() {
+  if [[ "$OLLAMA_ENABLED" != "1" ]]; then
+    log "ollama disabled by OLLAMA_ENABLED=$OLLAMA_ENABLED"
+    return
+  fi
+  require_command ollama
+
+  if ollama_ready; then
+    log "ollama already running: $(ollama_base_url)"
+  else
+    start_process "ollama" "OLLAMA_HOST=127.0.0.1:$OLLAMA_PORT exec ollama serve"
+    wait_http "ollama" "$(ollama_base_url)/api/tags"
+  fi
+
+  if ollama_has_model; then
+    log "ollama model ready: $OLLAMA_MODEL"
+  else
+    log "pulling ollama model: $OLLAMA_MODEL"
+    OLLAMA_HOST="$(ollama_base_url)" ollama pull "$OLLAMA_MODEL"
+  fi
+}
+
+ollama_status() {
+  if [[ "$OLLAMA_ENABLED" != "1" ]]; then
+    log "ollama disabled"
+    return
+  fi
+  if ollama_ready; then
+    if ollama_has_model; then
+      log "ollama running, http ready, model $OLLAMA_MODEL ready"
+    else
+      log "ollama running, http ready, model $OLLAMA_MODEL missing"
+    fi
+  else
+    log "ollama stopped"
+  fi
+}
+
 service_status() {
   local name="$1"
   local url="$2"
@@ -189,7 +244,7 @@ install_python_dependencies() {
     python3 -m venv "$venv_dir"
   fi
 
-  if ! "$venv_dir/bin/python" -c 'import fastapi, uvicorn' >/dev/null 2>&1; then
+  if ! "$venv_dir/bin/python" -c 'import fastapi, uvicorn, httpx, pydantic_settings' >/dev/null 2>&1; then
     log "installing Python AI Service dependencies"
     "$venv_dir/bin/python" -m pip install -q --upgrade pip
     "$venv_dir/bin/python" -m pip install -q -e "$ROOT_DIR/ai-service-python"
@@ -205,6 +260,28 @@ start_infra() {
   else
     (cd "$ROOT_DIR/infra" && docker compose up -d)
   fi
+}
+
+compose_exec() {
+  if [[ -f "$COMPOSE_ENV_FILE" ]]; then
+    (cd "$ROOT_DIR/infra" && docker compose --env-file "$COMPOSE_ENV_FILE" exec -T "$@")
+  else
+    (cd "$ROOT_DIR/infra" && docker compose exec -T "$@")
+  fi
+}
+
+apply_postgres_schema() {
+  local postgres_user="${POSTGRES_USER:-smart_support}"
+  local postgres_db="${POSTGRES_DB:-smart_support}"
+  log "applying PostgreSQL schema and protected taxonomy"
+  compose_exec postgres sh -lc "until pg_isready -U '$postgres_user' -d '$postgres_db' >/dev/null 2>&1; do sleep 1; done; psql -U '$postgres_user' -d '$postgres_db' -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/init.sql" > "$LOG_DIR/postgres-schema.log" 2>&1
+}
+
+apply_neo4j_schema() {
+  local neo4j_user="${NEO4J_USER:-neo4j}"
+  local neo4j_password="${NEO4J_PASSWORD:-smart_support}"
+  log "applying Neo4j indexes and constraints"
+  compose_exec neo4j sh -lc "until cypher-shell -u '$neo4j_user' -p '$neo4j_password' 'RETURN 1' >/dev/null 2>&1; do sleep 1; done; cypher-shell -u '$neo4j_user' -p '$neo4j_password' --format plain -f /imports/init.cypher" > "$LOG_DIR/neo4j-schema.log" 2>&1
 }
 
 stop_infra() {
@@ -224,6 +301,11 @@ start_all() {
   install_node_dependencies
   install_python_dependencies
   start_infra
+  apply_postgres_schema
+  if [[ "$APPLY_NEO4J_SCHEMA" == "1" ]]; then
+    apply_neo4j_schema
+  fi
+  start_ollama
 
   local jdk_home
   jdk_home="$(java_home)"
@@ -241,7 +323,14 @@ start_all() {
   node_dir="$(node_bin_dir)"
 
   log "packaging Java backend"
-  (cd "$ROOT_DIR" && export JAVA_HOME="$jdk_home" && export PATH="$JAVA_HOME/bin:$PATH" && bash -lc "mvn $maven_settings_arg -q -f backend-java/pom.xml -DskipTests package")
+  if ! (cd "$ROOT_DIR" && export JAVA_HOME="$jdk_home" && export PATH="$JAVA_HOME/bin:$PATH" && bash -lc "mvn $maven_settings_arg -q -f backend-java/pom.xml -DskipTests package"); then
+    if [[ -n "$maven_settings_arg" && "$MAVEN_SETTINGS_ALLOW_FALLBACK" == "1" ]]; then
+      log "Maven settings failed, retrying with default Maven repositories"
+      (cd "$ROOT_DIR" && export JAVA_HOME="$jdk_home" && export PATH="$JAVA_HOME/bin:$PATH" && mvn -q -f backend-java/pom.xml -DskipTests package)
+    else
+      return 1
+    fi
+  fi
 
   start_process "mcp-server-node" "$(with_node_path "$node_dir" "PORT=$MCP_PORT exec npm run dev:mcp-node")"
   start_process "ai-service-python" "exec ai-service-python/.venv/bin/python -m uvicorn app.main:app --app-dir ai-service-python --host 0.0.0.0 --port $AI_PORT"
@@ -265,6 +354,9 @@ start_all() {
   log "backend: http://localhost:$BACKEND_PORT/api/health"
   log "ai-service: http://localhost:$AI_PORT/health"
   log "mcp-server: http://localhost:$MCP_PORT/health"
+  if [[ "$OLLAMA_ENABLED" == "1" ]]; then
+    log "ollama: $(ollama_base_url) ($OLLAMA_MODEL)"
+  fi
 }
 
 stop_all() {
@@ -272,6 +364,7 @@ stop_all() {
   stop_process "backend-java"
   stop_process "ai-service-python"
   stop_process "mcp-server-node"
+  stop_process "ollama"
   stop_port_process "frontend" "$FRONTEND_PORT"
   stop_port_process "backend-java" "$BACKEND_PORT"
   stop_port_process "ai-service-python" "$AI_PORT"
@@ -293,6 +386,7 @@ status_all() {
   service_status "backend-java" "http://127.0.0.1:$BACKEND_PORT/api/health"
   service_status "ai-service-python" "http://127.0.0.1:$AI_PORT/health"
   service_status "mcp-server-node" "http://127.0.0.1:$MCP_PORT/health"
+  ollama_status
 }
 
 case "${1:-start}" in

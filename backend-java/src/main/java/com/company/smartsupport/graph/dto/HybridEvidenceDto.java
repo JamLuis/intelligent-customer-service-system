@@ -5,6 +5,9 @@ import java.util.Map;
 public record HybridEvidenceDto(
         String blockId,
         String sourceId,
+        String sourceFileName,
+        String sourceType,
+        String graphCategoryName,
         String rawTextSummary,
         double vectorScore,
         double bm25Score,

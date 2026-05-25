@@ -51,19 +51,67 @@ public class HybridRetrievalService {
                 knowledgeBlockRepository.vectorRecall(request.projectId(), request.queryVector(), request.embeddingModel(), request.embeddingVersion(), request.limit()));
         CompletableFuture<List<BlockRecallRow>> bm25Future = CompletableFuture.supplyAsync(() ->
                 knowledgeBlockRepository.bm25Recall(request.projectId(), keywords, request.limit()));
+        CompletableFuture<List<BlockRecallRow>> lexicalFuture = CompletableFuture.supplyAsync(() ->
+            knowledgeBlockRepository.lexicalRecall(request.projectId(), keywords, request.limit()));
         CompletableFuture<List<BlockRecallRow>> graphFuture = CompletableFuture.completedFuture(List.of());
-        CompletableFuture.allOf(vectorFuture, bm25Future, graphFuture).join();
+        CompletableFuture.allOf(vectorFuture, bm25Future, lexicalFuture, graphFuture).join();
 
         Map<String, HybridAccumulator> acc = new LinkedHashMap<>();
         vectorFuture.join().forEach(row -> acc.computeIfAbsent(row.blockId(), id -> new HybridAccumulator(row)).vectorScore = row.score());
         bm25Future.join().forEach(row -> acc.computeIfAbsent(row.blockId(), id -> new HybridAccumulator(row)).bm25Score = normalize(row.score()));
+        lexicalFuture.join().forEach(row -> acc.computeIfAbsent(row.blockId(), id -> new HybridAccumulator(row)).bm25Score = Math.max(acc.get(row.blockId()).bm25Score, normalize(row.score())));
         graphFuture.join().forEach(row -> acc.computeIfAbsent(row.blockId(), id -> new HybridAccumulator(row)).graphBoostScore = normalize(row.score()));
+
+        boolean sectionExpanded = expandBestMarkdownSection(request, acc);
 
         return acc.values().stream()
                 .map(item -> item.toDto(request.recencyAware(), vectorWeight, bm25Weight, graphWeight, recencyWeight))
                 .sorted((a, b) -> Double.compare(b.hybridScore(), a.hybridScore()))
-                .limit(request.limit())
+                .limit(sectionExpanded ? Math.max(request.limit(), Math.min(acc.size(), 30)) : request.limit())
                 .toList();
+    }
+
+    private boolean expandBestMarkdownSection(HybridRetrievalRequest request, Map<String, HybridAccumulator> acc) {
+        HybridAccumulator best = acc.values().stream()
+                .filter(item -> isMarkdownHeading(item.row))
+                .filter(item -> normalize(item.bm25Score) >= 0.5 || containsNormalized(request.questionText(), sectionPath(item.row)))
+                .max((a, b) -> Double.compare(a.bm25Score + a.vectorScore + a.graphBoostScore, b.bm25Score + b.vectorScore + b.graphBoostScore))
+                .orElse(null);
+        if (best == null) {
+            return false;
+        }
+        String sectionPath = sectionPath(best.row);
+        List<BlockRecallRow> sectionRows = knowledgeBlockRepository.sectionRecall(request.projectId(), best.row.sourceId(), sectionPath, Math.max(16, request.limit() * 3));
+        for (int index = 0; index < sectionRows.size(); index++) {
+            BlockRecallRow row = sectionRows.get(index);
+            HybridAccumulator item = acc.computeIfAbsent(row.blockId(), id -> new HybridAccumulator(row));
+            item.bm25Score = Math.max(item.bm25Score, Math.max(0.5, 0.95 - index * 0.01));
+        }
+        return !sectionRows.isEmpty();
+    }
+
+    private boolean isMarkdownHeading(BlockRecallRow row) {
+        Object parser = row.metadata().get("parser");
+        Object role = row.metadata().get("markdownRole");
+        return "markdown".equals(String.valueOf(parser)) && "heading".equals(String.valueOf(role));
+    }
+
+    private String sectionPath(BlockRecallRow row) {
+        Object sectionPath = row.metadata().get("sectionPath");
+        return sectionPath == null ? "" : String.valueOf(sectionPath);
+    }
+
+    private boolean containsNormalized(String questionText, String sectionPath) {
+        String question = normalizeForMatch(questionText);
+        String section = normalizeForMatch(sectionPath);
+        return !question.isBlank() && !section.isBlank() && (question.contains(section) || section.contains(question));
+    }
+
+    private String normalizeForMatch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("[#*_`|\\s、，。；：:（）()\\[\\]【】/\\\\-]+", "");
     }
 
     public List<String> simpleTokenize(String questionText) {
@@ -78,9 +126,34 @@ public class HybridRetrievalService {
         for (String token : normalized.split("\\s+")) {
             if (!token.isBlank()) {
                 tokens.add(token);
+                if (containsHan(token)) {
+                    tokens.addAll(hanNgrams(token));
+                }
             }
         }
-        return tokens.isEmpty() ? List.of("empty") : tokens;
+        return tokens.stream().distinct().toList().isEmpty() ? List.of("empty") : tokens.stream().distinct().toList();
+    }
+
+    private boolean containsHan(String value) {
+        return value.codePoints().anyMatch(codePoint -> Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN);
+    }
+
+    private List<String> hanNgrams(String value) {
+        List<Integer> codePoints = value.codePoints()
+                .filter(codePoint -> Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN)
+                .boxed()
+                .toList();
+        List<String> grams = new ArrayList<>();
+        for (int size : List.of(2, 3, 4)) {
+            for (int index = 0; index + size <= codePoints.size(); index++) {
+                StringBuilder builder = new StringBuilder();
+                for (int offset = 0; offset < size; offset++) {
+                    builder.appendCodePoint(codePoints.get(index + offset));
+                }
+                grams.add(builder.toString());
+            }
+        }
+        return grams;
     }
 
     private double normalize(double value) {
@@ -120,7 +193,7 @@ public class HybridRetrievalService {
             double recencyScore = recencyAware ? recencyScore(row.createdAt()) : 0;
             double hybridScore = vectorWeight * vectorScore + bm25Weight * bm25Score + graphWeight * graphBoostScore
                     + (recencyAware ? recencyWeight * recencyScore : 0);
-            return new HybridEvidenceDto(row.blockId(), row.sourceId(), row.rawTextSummary(), vectorScore, bm25Score,
+                return new HybridEvidenceDto(row.blockId(), row.sourceId(), row.sourceFileName(), row.sourceType(), row.graphCategoryName(), row.rawTextSummary(), vectorScore, bm25Score,
                     graphBoostScore, recencyScore, hybridScore, row.embeddingModel(), row.embeddingVersion(), new HashMap<>(row.metadata()));
         }
 

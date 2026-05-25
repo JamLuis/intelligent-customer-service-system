@@ -15,6 +15,8 @@ public record GraphAssetDetailDto(
         String activeRevisionId,
         String neo4jGraphRef,
         List<String> sourceRefs,
+        List<Map<String, Object>> sources,
+        List<Map<String, Object>> evidenceBlocks,
         List<String> entityTypes,
         List<String> relationTypes,
         List<String> classificationPath,

@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS graph_category (
 CREATE INDEX IF NOT EXISTS idx_graph_category_project_status ON graph_category (tenant_id, project_id, status, sort_order, category_id);
 CREATE INDEX IF NOT EXISTS idx_graph_category_domain ON graph_category (tenant_id, project_id, domain, status, sort_order);
 
+-- 旧 volume 可能仍保留 V0.1/V0.2 的领域枚举约束；这里幂等替换为通用字符校验。
+ALTER TABLE graph_category DROP CONSTRAINT IF EXISTS ck_graph_category_domain;
+ALTER TABLE graph_category
+  ADD CONSTRAINT ck_graph_category_domain CHECK (domain ~ '^[A-Za-z][A-Za-z0-9_\-]{0,63}$');
+
 COMMENT ON TABLE graph_category IS '知识图谱分类表（通用平台）：由租户/项目通过管理 API 自定义注册；系统不内置任何业务分类。';
 COMMENT ON COLUMN graph_category.project_id IS '项目级分类；通用模板可使用 *，但默认不再下发任何通用模板。';
 COMMENT ON COLUMN graph_category.domain IS '业务域标签（自由文本，仅作字符校验）；由租户自定义，例如 asset/event/integration 等，不再强制枚举。';

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     embedding_version: str = Field(default="v1", alias="EMBEDDING_VERSION")
 
     http_timeout_s: float = Field(default=30.0, alias="AI_HTTP_TIMEOUT_S")
+    knowledge_llm_extract_enabled: bool = Field(default=True, alias="KNOWLEDGE_LLM_EXTRACT_ENABLED")
 
 
 @lru_cache

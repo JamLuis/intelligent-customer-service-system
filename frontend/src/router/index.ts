@@ -3,6 +3,7 @@ import AppLayout from '../components/AppLayout.vue';
 import ChatView from '../views/ChatView.vue';
 import AdminGraphMaintenanceView from '../views/admin/AdminGraphMaintenanceView.vue';
 import AdminKnowledgeIngestView from '../views/admin/AdminKnowledgeIngestView.vue';
+import AdminKnowledgeModelConfigView from '../views/admin/AdminKnowledgeModelConfigView.vue';
 import AdminMcpToolsView from '../views/admin/AdminMcpToolsView.vue';
 import AdminTicketsView from '../views/admin/AdminTicketsView.vue';
 
@@ -29,13 +30,19 @@ export const router = createRouter({
           path: 'admin/knowledge/ingest',
           name: 'admin-knowledge-ingest',
           component: AdminKnowledgeIngestView,
-          meta: { title: '知识录入与预览', subtitle: '按图谱分类录入知识源并预览入图结果' }
+          meta: { title: '知识录入与预览', subtitle: '上传资料后自动解析、留证据并生成候选图谱' }
         },
         {
           path: 'admin/knowledge/graphs',
           name: 'admin-graph-maintenance',
           component: AdminGraphMaintenanceView,
           meta: { title: '历史知识图谱维护', subtitle: '按分类、实体和关系维护历史图谱资产' }
+        },
+        {
+          path: 'admin/knowledge/model-config',
+          name: 'admin-knowledge-model-config',
+          component: AdminKnowledgeModelConfigView,
+          meta: { title: '模型配置', subtitle: '对话问答与知识抽取模型独立配置，本地/云端参数互不覆盖' }
         },
         {
           path: 'admin/tickets',
