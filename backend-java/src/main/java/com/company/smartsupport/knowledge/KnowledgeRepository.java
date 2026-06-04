@@ -283,6 +283,32 @@ public class KnowledgeRepository {
                 .single();
     }
 
+    public void updateBlockEmbedding(String projectId, String blockId, List<Double> vector, String embeddingModel, String embeddingVersion, int embeddingDim) {
+        if (vector == null || vector.isEmpty()) {
+            return;
+        }
+        if (vector.size() != embeddingDim) {
+            throw new SmartSupportException("ICSS-KG-422-EMBEDDING_DIM_MISMATCH", "embedding 维度与模型配置不一致");
+        }
+        jdbcClient.sql("""
+                UPDATE knowledge_block
+                SET embedding = CAST(:embedding AS vector),
+                    embedding_model = :embeddingModel,
+                    embedding_version = :embeddingVersion,
+                    embedding_dim = :embeddingDim
+                WHERE tenant_id = 'default'
+                  AND project_id = :projectId
+                  AND block_id = CAST(:blockId AS uuid)
+                """)
+                .param("projectId", projectId)
+                .param("blockId", blockId)
+                .param("embedding", toVectorLiteral(vector))
+                .param("embeddingModel", embeddingModel)
+                .param("embeddingVersion", embeddingVersion)
+                .param("embeddingDim", embeddingDim)
+                .update();
+    }
+
     public String insertCandidateEntity(String projectId, SourceRecord source, Map<String, Object> candidate, String blockId) {
         String candidateId = UUID.randomUUID().toString();
         jdbcClient.sql("""
@@ -949,6 +975,10 @@ public class KnowledgeRepository {
                 .map(String::valueOf)
                 .distinct()
                 .toList();
+    }
+
+    private String toVectorLiteral(List<Double> vector) {
+        return "[" + vector.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse("") + "]";
     }
 
     private BigDecimal averageConfidence(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {

@@ -10,7 +10,13 @@ AI_PORT="${AI_PORT:-8100}"
 MCP_PORT="${MCP_PORT:-3202}"
 BACKEND_PORT="${BACKEND_PORT:-8088}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-OLLAMA_ENABLED="${OLLAMA_ENABLED:-1}"
+MLX_ENABLED="${MLX_ENABLED:-1}"
+MLX_HOST="${MLX_HOST:-127.0.0.1}"
+MLX_PORT="${MLX_PORT:-18090}"
+MLX_MODEL="${MLX_MODEL:-mlx-community/Qwen3.5-2B-4bit}"
+MLX_MAX_TOKENS="${MLX_MAX_TOKENS:-512}"
+MLX_PYTHON="${MLX_PYTHON:-}"
+OLLAMA_ENABLED="${OLLAMA_ENABLED:-0}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:1.5b}"
 NODE_MIN_MAJOR="${NODE_MIN_MAJOR:-20}"
@@ -201,6 +207,81 @@ ollama_status() {
   fi
 }
 
+mlx_python() {
+  local candidate
+
+  if [[ -n "$MLX_PYTHON" && -x "$MLX_PYTHON" ]]; then
+    printf '%s' "$MLX_PYTHON"
+    return
+  fi
+
+  for candidate in \
+    "$ROOT_DIR/../.venv/bin/python" \
+    "$ROOT_DIR/.venv/bin/python" \
+    "$ROOT_DIR/ai-service-python/.venv/bin/python" \
+    "$(command -v python3 2>/dev/null || true)"; do
+    [[ -x "$candidate" ]] || continue
+    printf '%s' "$candidate"
+    return
+  done
+
+  log "Python not found for MLX; set MLX_PYTHON"
+  exit 1
+}
+
+mlx_base_url() {
+  printf 'http://%s:%s/v1' "$MLX_HOST" "$MLX_PORT"
+}
+
+mlx_ready() {
+  http_ready "$(mlx_base_url)/models"
+}
+
+ensure_mlx_dependencies() {
+  if [[ "$MLX_ENABLED" != "1" ]]; then
+    return
+  fi
+
+  local py
+  py="$(mlx_python)"
+  if ! "$py" -c 'import mlx_lm, mlx_embeddings' >/dev/null 2>&1; then
+    log "installing MLX dependencies into $py"
+    "$py" -m pip install -q -U mlx-lm mlx-embeddings
+  fi
+}
+
+start_mlx() {
+  if [[ "$MLX_ENABLED" != "1" ]]; then
+    log "mlx disabled by MLX_ENABLED=$MLX_ENABLED"
+    return
+  fi
+
+  ensure_mlx_dependencies
+
+  if mlx_ready; then
+    log "mlx already running: $(mlx_base_url)"
+  else
+    local py
+    py="$(mlx_python)"
+    start_process "mlx" "exec '$py' -m mlx_lm server --model '$MLX_MODEL' --host '$MLX_HOST' --port '$MLX_PORT' --max-tokens '$MLX_MAX_TOKENS' --temp 0 --chat-template-args '{\"enable_thinking\":false}' --log-level INFO"
+    wait_http "mlx" "$(mlx_base_url)/models"
+  fi
+
+  log "mlx model ready: $MLX_MODEL"
+}
+
+mlx_status() {
+  if [[ "$MLX_ENABLED" != "1" ]]; then
+    log "mlx disabled"
+    return
+  fi
+  if mlx_ready; then
+    log "mlx running, http ready, model $MLX_MODEL"
+  else
+    log "mlx stopped"
+  fi
+}
+
 service_status() {
   local name="$1"
   local url="$2"
@@ -244,7 +325,7 @@ install_python_dependencies() {
     python3 -m venv "$venv_dir"
   fi
 
-  if ! "$venv_dir/bin/python" -c 'import fastapi, uvicorn, httpx, pydantic_settings' >/dev/null 2>&1; then
+  if ! "$venv_dir/bin/python" -c 'import fastapi, uvicorn, httpx, pydantic_settings, mlx_embeddings' >/dev/null 2>&1; then
     log "installing Python AI Service dependencies"
     "$venv_dir/bin/python" -m pip install -q --upgrade pip
     "$venv_dir/bin/python" -m pip install -q -e "$ROOT_DIR/ai-service-python"
@@ -300,11 +381,13 @@ start_all() {
   require_command curl
   install_node_dependencies
   install_python_dependencies
+  ensure_mlx_dependencies
   start_infra
   apply_postgres_schema
   if [[ "$APPLY_NEO4J_SCHEMA" == "1" ]]; then
     apply_neo4j_schema
   fi
+  start_mlx
   start_ollama
 
   local jdk_home
@@ -357,6 +440,9 @@ start_all() {
   if [[ "$OLLAMA_ENABLED" == "1" ]]; then
     log "ollama: $(ollama_base_url) ($OLLAMA_MODEL)"
   fi
+  if [[ "$MLX_ENABLED" == "1" ]]; then
+    log "mlx: $(mlx_base_url) ($MLX_MODEL)"
+  fi
 }
 
 stop_all() {
@@ -364,11 +450,13 @@ stop_all() {
   stop_process "backend-java"
   stop_process "ai-service-python"
   stop_process "mcp-server-node"
+  stop_process "mlx"
   stop_process "ollama"
   stop_port_process "frontend" "$FRONTEND_PORT"
   stop_port_process "backend-java" "$BACKEND_PORT"
   stop_port_process "ai-service-python" "$AI_PORT"
   stop_port_process "mcp-server-node" "$MCP_PORT"
+  stop_port_process "mlx" "$MLX_PORT"
   stop_infra
 }
 
@@ -386,6 +474,7 @@ status_all() {
   service_status "backend-java" "http://127.0.0.1:$BACKEND_PORT/api/health"
   service_status "ai-service-python" "http://127.0.0.1:$AI_PORT/health"
   service_status "mcp-server-node" "http://127.0.0.1:$MCP_PORT/health"
+  mlx_status
   ollama_status
 }
 

@@ -1,0 +1,116 @@
+[
+  {
+    "caseId": "generic_device_identifiers",
+    "sourceType": "text",
+    "sourceId": "gold-generic-1",
+    "fileName": "device.txt",
+    "graphCategoryId": "uncategorized",
+    "rawText": "塔吊A21212 有5个摄像头设备，编号分别为 C123123、C234234、C4324",
+    "expectedEntities": [
+      ["ExtractedObject", "塔吊A21212"],
+      ["ExtractedObject", "摄像头设备"],
+      ["ExtractedIdentifier", "A21212"],
+      ["ExtractedIdentifier", "C123123"],
+      ["ExtractedIdentifier", "C234234"],
+      ["ExtractedIdentifier", "C4324"],
+      ["ExtractedQuantity", "5个"]
+    ],
+    "expectedRelations": [
+      ["塔吊A21212", "HAS_IDENTIFIER", "A21212"],
+      ["塔吊A21212", "HAS_COMPONENT", "摄像头设备"],
+      ["摄像头设备", "HAS_IDENTIFIER", "C123123"],
+      ["摄像头设备", "HAS_IDENTIFIER", "C234234"],
+      ["摄像头设备", "HAS_IDENTIFIER", "C4324"],
+      ["摄像头设备", "HAS_QUANTITY", "5个"]
+    ],
+    "forbiddenEntities": []
+  },
+  {
+    "caseId": "markdown_components",
+    "sourceType": "md",
+    "sourceId": "gold-md-1",
+    "fileName": "finance.md",
+    "graphCategoryId": "uncategorized",
+    "rawText": "# 金融大模型能力评测\n\n金融大模型需要覆盖知识问答、风险识别、合规审查和报告生成。\nQwen 本地模型适合离线初筛，云模型适合高准确率复核。",
+    "expectedEntities": [
+      ["ExtractedObject", "金融大模型"],
+      ["ExtractedObject", "知识问答"],
+      ["ExtractedObject", "风险识别"],
+      ["ExtractedObject", "合规审查"],
+      ["ExtractedObject", "报告生成"],
+      ["ExtractedObject", "Qwen 本地模型"],
+      ["ExtractedObject", "离线初筛"],
+      ["ExtractedObject", "云模型"],
+      ["ExtractedObject", "高准确率复核"]
+    ],
+    "expectedRelations": [
+      ["金融大模型", "HAS_COMPONENT", "知识问答"],
+      ["金融大模型", "HAS_COMPONENT", "风险识别"],
+      ["金融大模型", "HAS_COMPONENT", "合规审查"],
+      ["金融大模型", "HAS_COMPONENT", "报告生成"],
+      ["Qwen 本地模型", "HAS_VALUE", "离线初筛"],
+      ["云模型", "HAS_VALUE", "高准确率复核"]
+    ],
+    "forbiddenEntities": []
+  },
+  {
+    "caseId": "sql_ddl_table_columns",
+    "sourceType": "sql",
+    "sourceId": "gold-sql-1",
+    "fileName": "schema.sql",
+    "graphCategoryId": "uncategorized",
+    "rawText": "CREATE TABLE support_ticket (id BIGINT NOT NULL COMMENT '主键', title VARCHAR(128) NOT NULL COMMENT '标题', status VARCHAR(32) DEFAULT 'open' COMMENT '状态', PRIMARY KEY (id)) COMMENT='工单表';",
+    "expectedEntities": [
+      ["ExtractedObject", "support_ticket 表：工单表"],
+      ["ExtractedIdentifier", "support_ticket"],
+      ["ExtractedObject", "id 字段：主键"],
+      ["ExtractedIdentifier", "id"],
+      ["ExtractedObject", "类型：BIGINT"],
+      ["ExtractedObject", "约束：NOT NULL"],
+      ["ExtractedObject", "注释：主键"],
+      ["ExtractedObject", "title 字段：标题"],
+      ["ExtractedIdentifier", "title"],
+      ["ExtractedObject", "类型：VARCHAR(128)"],
+      ["ExtractedObject", "注释：标题"],
+      ["ExtractedObject", "status 字段：状态"],
+      ["ExtractedIdentifier", "status"],
+      ["ExtractedObject", "类型：VARCHAR(32)"],
+      ["ExtractedObject", "约束：NULL"],
+      ["ExtractedObject", "注释：状态"],
+      ["ExtractedObject", "support_ticket 主键"],
+      ["ExtractedObject", "主键字段：id"]
+    ],
+    "expectedRelations": [
+      ["support_ticket 表：工单表", "HAS_IDENTIFIER", "support_ticket"],
+      ["support_ticket 表：工单表", "HAS_COMPONENT", "id 字段：主键"],
+      ["id 字段：主键", "HAS_IDENTIFIER", "id"],
+      ["id 字段：主键", "HAS_VALUE", "类型：BIGINT"],
+      ["id 字段：主键", "HAS_VALUE", "约束：NOT NULL"],
+      ["id 字段：主键", "HAS_VALUE", "注释：主键"],
+      ["support_ticket 表：工单表", "HAS_COMPONENT", "title 字段：标题"],
+      ["title 字段：标题", "HAS_IDENTIFIER", "title"],
+      ["title 字段：标题", "HAS_VALUE", "类型：VARCHAR(128)"],
+      ["title 字段：标题", "HAS_VALUE", "约束：NOT NULL"],
+      ["title 字段：标题", "HAS_VALUE", "注释：标题"],
+      ["support_ticket 表：工单表", "HAS_COMPONENT", "status 字段：状态"],
+      ["status 字段：状态", "HAS_IDENTIFIER", "status"],
+      ["status 字段：状态", "HAS_VALUE", "类型：VARCHAR(32)"],
+      ["status 字段：状态", "HAS_VALUE", "约束：NULL"],
+      ["status 字段：状态", "HAS_VALUE", "注释：状态"],
+      ["support_ticket 表：工单表", "HAS_COMPONENT", "support_ticket 主键"],
+      ["support_ticket 主键", "HAS_VALUE", "主键字段：id"]
+    ],
+    "forbiddenEntities": []
+  },
+  {
+    "caseId": "generic_bad_entity_reject",
+    "sourceType": "text",
+    "sourceId": "gold-bad-1",
+    "fileName": "bad.txt",
+    "graphCategoryId": "uncategorized",
+    "rawText": "系统能力包含相关信息、其他内容和五个部门。",
+    "expectedEntities": [],
+    "expectedRelations": [],
+    "forbiddenEntities": ["系统能力", "相关信息", "其他内容", "五个部门"]
+  }
+]

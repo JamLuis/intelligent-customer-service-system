@@ -1,0 +1,65 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "routeId": "K12", "routeName": "K12 快速公交", "riskLevel": "danger", "alertCount": 18, "riskScore": 92 },
+      "geometry": { "type": "LineString", "coordinates": [[119.351, 32.155], [119.369, 32.161], [119.389, 32.167], [119.410, 32.174], [119.430, 32.182], [119.445, 32.190], [119.459, 32.197], [119.475, 32.205], [119.492, 32.214], [119.507, 32.222]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "K18", "routeName": "K18 城市支线", "riskLevel": "warning", "alertCount": 9, "riskScore": 76 },
+      "geometry": { "type": "LineString", "coordinates": [[119.365, 32.223], [119.382, 32.216], [119.401, 32.209], [119.421, 32.203], [119.442, 32.199], [119.463, 32.196], [119.484, 32.195], [119.505, 32.196]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "B2", "routeName": "B2 夜班线路", "riskLevel": "safe", "alertCount": 4, "riskScore": 58 },
+      "geometry": { "type": "LineString", "coordinates": [[119.371, 32.188], [119.391, 32.184], [119.410, 32.182], [119.430, 32.183], [119.450, 32.187], [119.470, 32.194], [119.490, 32.202], [119.509, 32.210]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "D1", "routeName": "D1 城际快线", "riskLevel": "safe", "alertCount": 2, "riskScore": 41 },
+      "geometry": { "type": "LineString", "coordinates": [[119.340, 32.198], [119.361, 32.199], [119.384, 32.201], [119.406, 32.203], [119.429, 32.205], [119.452, 32.206], [119.477, 32.206], [119.503, 32.204]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "1", "routeName": "1 路", "riskLevel": "safe", "alertCount": 1, "riskScore": 32 },
+      "geometry": { "type": "LineString", "coordinates": [[119.355, 32.214], [119.377, 32.210], [119.399, 32.205], [119.422, 32.200], [119.444, 32.196], [119.468, 32.191], [119.491, 32.187], [119.513, 32.183]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "10", "routeName": "10 路", "riskLevel": "safe", "alertCount": 2, "riskScore": 35 },
+      "geometry": { "type": "LineString", "coordinates": [[119.381, 32.230], [119.391, 32.219], [119.401, 32.209], [119.412, 32.198], [119.423, 32.188], [119.434, 32.178], [119.445, 32.168], [119.456, 32.159]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "19", "routeName": "19 路", "riskLevel": "warning", "alertCount": 6, "riskScore": 71 },
+      "geometry": { "type": "LineString", "coordinates": [[119.398, 32.227], [119.408, 32.217], [119.419, 32.208], [119.431, 32.200], [119.444, 32.194], [119.458, 32.189], [119.473, 32.186], [119.489, 32.184], [119.505, 32.183]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "24", "routeName": "24 路", "riskLevel": "safe", "alertCount": 3, "riskScore": 44 },
+      "geometry": { "type": "LineString", "coordinates": [[119.360, 32.170], [119.377, 32.176], [119.395, 32.181], [119.414, 32.185], [119.433, 32.188], [119.453, 32.191], [119.474, 32.194], [119.495, 32.198]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "29", "routeName": "29 路", "riskLevel": "safe", "alertCount": 2, "riskScore": 39 },
+      "geometry": { "type": "LineString", "coordinates": [[119.367, 32.205], [119.386, 32.203], [119.406, 32.201], [119.426, 32.200], [119.447, 32.199], [119.469, 32.198], [119.491, 32.198], [119.513, 32.199]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "56", "routeName": "56 路", "riskLevel": "safe", "alertCount": 1, "riskScore": 28 },
+      "geometry": { "type": "LineString", "coordinates": [[119.373, 32.162], [119.387, 32.171], [119.403, 32.179], [119.421, 32.187], [119.440, 32.194], [119.460, 32.200], [119.481, 32.205], [119.502, 32.209]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "81", "routeName": "81 路", "riskLevel": "safe", "alertCount": 2, "riskScore": 36 },
+      "geometry": { "type": "LineString", "coordinates": [[119.344, 32.184], [119.361, 32.189], [119.379, 32.193], [119.398, 32.197], [119.417, 32.202], [119.437, 32.207], [119.458, 32.212], [119.480, 32.216]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "routeId": "203", "routeName": "203 路", "riskLevel": "safe", "alertCount": 1, "riskScore": 31 },
+      "geometry": { "type": "LineString", "coordinates": [[119.390, 32.153], [119.403, 32.161], [119.417, 32.170], [119.432, 32.178], [119.448, 32.186], [119.465, 32.194], [119.483, 32.201], [119.502, 32.208]] }
+    }
+  ]
+}

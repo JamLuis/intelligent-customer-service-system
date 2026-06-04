@@ -82,6 +82,7 @@ async function submitKnowledge() {
     tasks.value = await api.getKnowledgeTasks(String(source.value.sourceId));
     blocks.value = await api.getKnowledgeBlocks(String(source.value.sourceId));
     candidates.value = await api.getKnowledgeCandidates(String(source.value.sourceId));
+    debugger;
     await loadPreviewGraphs(String(source.value.sourceId));
     ElMessage.success('知识源已提交，已刷新入图预览');
   } catch (error) {

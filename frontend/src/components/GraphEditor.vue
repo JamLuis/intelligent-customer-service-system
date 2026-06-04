@@ -112,6 +112,16 @@ const graphHasDocumentStructure = computed(() => {
   return types.has('Document') && (types.has('Section') || types.has('SourceBlock'));
 });
 const hasNonEvidenceEdges = computed(() => edges.value.some((edge) => String(edge.data?.relationType || edge.label || '') !== 'HAS_EVIDENCE'));
+const relationLabelByType = computed(() => {
+  const result = new Map<string, string>();
+  relationTypeOptions.value.forEach((item) => {
+    const value = optionValue(item);
+    if (value) {
+      result.set(value, String(item.label || value));
+    }
+  });
+  return result;
+});
 
 function optionValue(item: GraphTypeOption) {
   return item.type || item.entityType || item.relationType || '';
@@ -187,16 +197,23 @@ function normalizeEdges(graphEdges: GraphEdgePayload[] = []): FlowEdge[] {
     });
 }
 
+function relationDisplayLabel(edge: FlowEdge) {
+  const relation = String(edge.data?.relationType || edge.label || 'RELATED_TO');
+  return relationLabelByType.value.get(relation) || relation;
+}
+
 const flowEdges = computed<FlowEdge[]>(() => {
   return edges.value
     .filter((edge) => !shouldHideEdge(edge))
     .map((edge) => ({
       ...edge,
       type: 'straight',
-      label: edgeMode.value === 'all' ? edge.label : '',
+      label: relationDisplayLabel(edge),
       style: edgeStyle(edge),
-      labelStyle: { fontSize: 10, fill: '#42515a' },
-      labelBgStyle: { fill: '#ffffff', fillOpacity: 0.88 }
+      labelStyle: { fontSize: 11, fill: '#23313a', fontWeight: 650 },
+      labelBgStyle: { fill: '#ffffff', fillOpacity: 0.92 },
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 4
     }));
 });
 

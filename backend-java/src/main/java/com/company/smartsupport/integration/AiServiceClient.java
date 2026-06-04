@@ -40,6 +40,10 @@ public class AiServiceClient {
         return post("/knowledge/extract", request);
     }
 
+    public Optional<Map<String, Object>> embedKnowledge(Map<String, Object> request) {
+        return post("/knowledge/embed", request);
+    }
+
     public Optional<Map<String, Object>> checkLlm(Map<String, Object> request) {
         return post("/llm/check", request);
     }

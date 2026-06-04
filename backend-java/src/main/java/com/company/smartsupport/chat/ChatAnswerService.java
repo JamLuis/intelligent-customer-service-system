@@ -31,17 +31,19 @@ public class ChatAnswerService {
             throw new SmartSupportException("ICSS-DIAG-400-QUESTION_EMPTY", "问题不能为空");
         }
         ModelProfileDto profile = modelProfileService.activeProfile(projectId, ModelProfileService.PURPOSE_CHAT_ANSWER);
+        Map<String, Object> chatAiConfig = modelProfileService.activeAiConfig(projectId, ModelProfileService.PURPOSE_CHAT_ANSWER);
         boolean forceGraphGrounding = booleanValue(body.get("forceGraphGrounding"), false) || profile.forceGraphGrounding();
         Map<String, Object> searchRequest = new LinkedHashMap<>();
         searchRequest.put("questionText", questionText);
         searchRequest.put("keywords", body.getOrDefault("keywords", List.of()));
         searchRequest.put("limit", intValue(body.get("limit"), 8));
         searchRequest.put("recencyAware", body.getOrDefault("recencyAware", false));
+        applyQueryEmbedding(searchRequest, questionText, chatAiConfig);
         Map<String, Object> retrieval = graphSearchService.searchDiagnosis(projectId, searchRequest);
         Map<String, Object> aiRequest = new LinkedHashMap<>();
         aiRequest.put("questionText", questionText);
         aiRequest.put("forceGraphGrounding", forceGraphGrounding);
-        aiRequest.put("llmConfig", modelProfileService.activeAiConfig(projectId, ModelProfileService.PURPOSE_CHAT_ANSWER));
+        aiRequest.put("llmConfig", chatAiConfig);
         aiRequest.put("vectorEvidence", retrieval.getOrDefault("vectorEvidence", List.of()));
         aiRequest.put("graphPaths", retrieval.getOrDefault("graphPaths", List.of()));
         aiRequest.put("matchedEntities", retrieval.getOrDefault("matchedEntities", List.of()));
@@ -59,6 +61,24 @@ public class ChatAnswerService {
         response.putIfAbsent("degraded", false);
         response.putIfAbsent("forceGraphGrounding", forceGraphGrounding);
         return response;
+    }
+
+    private void applyQueryEmbedding(Map<String, Object> searchRequest, String questionText, Map<String, Object> aiConfig) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("blocks", List.of(Map.of("blockId", "query", "text", questionText)));
+        request.put("llmConfig", aiConfig);
+        aiServiceClient.embedKnowledge(request).ifPresent(response -> {
+            List<?> embeddings = response.get("embeddings") instanceof List<?> list ? list : List.of();
+            if (embeddings.isEmpty() || !(embeddings.getFirst() instanceof Map<?, ?> first)) {
+                return;
+            }
+            Object vector = first.get("vector");
+            if (vector instanceof List<?> list && !list.isEmpty()) {
+                searchRequest.put("queryVector", list);
+                searchRequest.put("embeddingModel", response.getOrDefault("embeddingModel", aiConfig.get("embeddingModel")));
+                searchRequest.put("embeddingVersion", response.getOrDefault("embeddingVersion", "v1"));
+            }
+        });
     }
 
     private Map<String, Object> fallbackAnswer(String questionText, Map<String, Object> retrieval, ModelProfileDto profile, boolean forceGraphGrounding, boolean degraded) {

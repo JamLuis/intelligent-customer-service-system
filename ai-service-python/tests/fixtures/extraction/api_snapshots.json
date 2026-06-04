@@ -1,0 +1,66 @@
+{
+  "parseMarkdown": {
+    "request": {
+      "sourceId": "api-parse-1",
+      "sourceType": "text",
+      "fileName": "baseline.md",
+      "graphCategoryId": "uncategorized",
+      "rawText": "# 基线文档\n\n金融大模型需要覆盖知识问答、风险识别。"
+    },
+    "expected": {
+      "sourceId": "api-parse-1",
+      "degraded": false,
+      "blockCount": 2,
+      "firstBlockType": "title",
+      "firstBlockParser": "markdown",
+      "secondBlockSectionPath": "基线文档"
+    }
+  },
+  "extractGeneric": {
+    "request": {
+      "sourceId": "api-extract-1",
+      "fileName": "device.txt",
+      "graphCategoryId": "uncategorized",
+      "rawText": "塔吊A21212 有5个摄像头设备，编号分别为 C123123、C234234"
+    },
+    "expected": {
+      "entities": [
+        ["ExtractedObject", "塔吊A21212"],
+        ["ExtractedObject", "摄像头设备"],
+        ["ExtractedIdentifier", "A21212"],
+        ["ExtractedIdentifier", "C123123"],
+        ["ExtractedIdentifier", "C234234"],
+        ["ExtractedQuantity", "5个"]
+      ],
+      "relations": [
+        ["塔吊A21212", "HAS_COMPONENT", "摄像头设备"],
+        ["塔吊A21212", "HAS_IDENTIFIER", "A21212"],
+        ["摄像头设备", "HAS_IDENTIFIER", "C123123"],
+        ["摄像头设备", "HAS_IDENTIFIER", "C234234"],
+        ["摄像头设备", "HAS_QUANTITY", "5个"]
+      ]
+    }
+  },
+  "embedEmpty": {
+    "request": {
+      "blocks": []
+    },
+    "expected": {
+      "embeddings": [],
+      "embeddingDim": 1024,
+      "embeddingVersion": "v1"
+    }
+  },
+  "chatNoEvidence": {
+    "request": {
+      "questionText": "金融大模型适合什么场景？",
+      "vectorEvidence": [],
+      "graphPaths": []
+    },
+    "expected": {
+      "confidence": 0.0,
+      "cannotAnswerReason": "NO_KNOWLEDGE_EVIDENCE",
+      "evidenceRefs": []
+    }
+  }
+}

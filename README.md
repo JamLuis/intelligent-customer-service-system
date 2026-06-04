@@ -120,15 +120,23 @@ export MAVEN_SETTINGS=/Users/lucas/Work/CompanyProject/app-ship-alarm/settings.x
 
 如果内网 Maven 仓库不可用，启动脚本会默认回退到 Maven 公共仓库继续打包；如需禁止回退，可设置 `MAVEN_SETTINGS_ALLOW_FALLBACK=0`。
 
-开放信息抽取默认走 OpenAI-compatible LLM 接口，可接云端大模型，也可接本地 vLLM / Ollama / LM Studio 等兼容服务：
+开放信息抽取默认走 OpenAI-compatible LLM 接口，可接云端大模型，也可接本地 MLX / vLLM / Ollama / LM Studio 等兼容服务。本机 Apple Silicon 默认推荐 MLX：
 
 ```bash
 export KNOWLEDGE_LLM_EXTRACT_ENABLED=true
-export LLM_API_BASE_URL=http://127.0.0.1:11434/v1
-export LLM_MODEL=qwen2.5:1.5b
+export LLM_API_BASE_URL=http://127.0.0.1:18090/v1
+export LLM_MODEL=mlx-community/Qwen3.5-2B-4bit
 ```
 
-`./scripts/start-all.sh start` 会默认启动本地 Ollama 服务并确保 `OLLAMA_MODEL` 存在，默认模型为 `qwen2.5:1.5b`。可通过环境变量调整：
+`./scripts/start-all.sh start` 会默认启动本地 MLX 服务并加载 `MLX_MODEL`，默认模型为 `mlx-community/Qwen3.5-2B-4bit`。可通过环境变量调整：
+
+```bash
+export MLX_ENABLED=1
+export MLX_PORT=18090
+export MLX_MODEL=mlx-community/Qwen3.5-2B-4bit
+```
+
+Ollama 适配能力保留，但默认不再启动。如需在其他机器迁移回 Ollama，可显式启用：
 
 ```bash
 export OLLAMA_ENABLED=1
@@ -136,9 +144,9 @@ export OLLAMA_PORT=11434
 export OLLAMA_MODEL=qwen2.5:1.5b
 ```
 
-后台模型配置页支持扫描本机模型：打开 `/admin/knowledge/model-config` 后点击“扫描本机模型”，系统会自动识别本机 Ollama、llama.cpp 和 LM Studio 暴露的模型。用户只需要选择模型并点击“一键使用选中模型”，系统会自动填入服务地址、模型名、运行时、Token 上限等参数，并完成保存、验证和启用。
+后台模型配置页支持扫描本机模型：打开 `/admin/knowledge/model-config` 后点击“扫描本机模型”，系统会自动识别本机 MLX、Ollama、llama.cpp 和 LM Studio 暴露的模型。用户只需要选择模型并点击“一键使用选中模型”，系统会自动填入服务地址、模型名、运行时、Token 上限等参数，并完成保存、验证和启用。
 
-模型配置页已支持“自由选择 + 自动检查 + 运行时启动”：切换本地模型时会自动触发连接检查；当 Ollama 或 llama.cpp 显示“未启动”时，可直接点击“启动”按钮在配置页拉起对应本地服务（LM Studio 仍需手动从桌面应用启动）。
+模型配置页已支持“自由选择 + 自动检查 + 运行时启动”：切换本地模型时会自动触发连接检查；当 MLX、Ollama 或 llama.cpp 显示“未启动”时，可直接点击“启动”按钮在配置页拉起对应本地服务（LM Studio 仍需手动从桌面应用启动）。
 
 ```bash
 ./scripts/start-all.sh start

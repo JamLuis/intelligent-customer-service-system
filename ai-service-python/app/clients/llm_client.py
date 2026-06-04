@@ -4,10 +4,12 @@ Targets Aliyun Bailian (DashScope) compatible-mode endpoint by default, but any
 OpenAI-compatible base URL works (DeepSeek, Moonshot, vLLM gateways, etc.).
 
 Embedding model + dim are pinned via env (EMBEDDING_MODEL / EMBEDDING_DIM /
-EMBEDDING_VERSION); KG-DB-001 pgvector(1536) is the source of truth.
+EMBEDDING_VERSION); the local BGE-M3 MLX path uses pgvector(1024).
 """
 from __future__ import annotations
 
+from pathlib import Path
+from threading import Lock
 from typing import Iterable
 
 import httpx
@@ -17,6 +19,13 @@ from app.settings import Settings, get_settings
 
 class LLMClientError(RuntimeError):
     pass
+
+
+_MLX_BGE_ALIASES = {
+    "mlx-community/bge-m3-4bit": "mlx-community/bge-m3-mlx-4bit",
+}
+_mlx_embedding_cache: dict[str, tuple[object, object]] = {}
+_mlx_embedding_lock = Lock()
 
 
 class LLMClient:
@@ -39,9 +48,12 @@ class LLMClient:
         self._client.close()
 
     def embeddings(self, texts: Iterable[str]) -> list[list[float]]:
+        text_list = list(texts)
+        if self._is_mlx_embedding_model():
+            return self._mlx_embeddings(text_list)
         payload = {
             "model": self.s.embedding_model,
-            "input": list(texts),
+            "input": text_list,
             "dimensions": self.s.embedding_dim,
         }
         try:
@@ -58,6 +70,58 @@ class LLMClient:
                     f"embedding dim mismatch: got {len(v)} expected {self.s.embedding_dim}"
                 )
         return vectors
+
+    def _is_mlx_embedding_model(self) -> bool:
+        model = self._resolved_embedding_model().lower()
+        return model.startswith("mlx-community/") and ("bge" in model or "embedding" in model)
+
+    def _resolved_embedding_model(self) -> str:
+        return _MLX_BGE_ALIASES.get(self.s.embedding_model, self.s.embedding_model)
+
+    def _mlx_embeddings(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        try:
+            model, tokenizer = self._load_mlx_embedding_model()
+            token_batches = [tokenizer.encode(text) for text in texts]
+            pad_token_id = tokenizer.pad_token_id or 0
+            max_len = max(len(tokens) for tokens in token_batches)
+            padded = [tokens + [pad_token_id] * (max_len - len(tokens)) for tokens in token_batches]
+            mask = [[1.0] * len(tokens) + [0.0] * (max_len - len(tokens)) for tokens in token_batches]
+
+            import mlx.core as mx
+
+            output = model(mx.array(padded))
+            hidden = output.last_hidden_state
+            attention_mask = mx.array(mask)[:, :, None]
+            pooled = (hidden * attention_mask).sum(axis=1) / attention_mask.sum(axis=1)
+            norm = mx.sqrt((pooled * pooled).sum(axis=1, keepdims=True))
+            vectors = (pooled / mx.maximum(norm, 1e-12)).tolist()
+        except Exception as ex:
+            raise LLMClientError(f"mlx embeddings failed: {ex}") from ex
+        for vector in vectors:
+            if len(vector) != self.s.embedding_dim:
+                raise LLMClientError(
+                    f"embedding dim mismatch: got {len(vector)} expected {self.s.embedding_dim}"
+                )
+        return vectors
+
+    def _load_mlx_embedding_model(self) -> tuple[object, object]:
+        model_id = self._resolved_embedding_model()
+        with _mlx_embedding_lock:
+            cached = _mlx_embedding_cache.get(model_id)
+            if cached is not None:
+                return cached
+            try:
+                from huggingface_hub import snapshot_download
+                from mlx_embeddings.utils import load_model, load_tokenizer
+
+                model_path = Path(snapshot_download(repo_id=model_id))
+                loaded = (load_model(model_path), load_tokenizer(model_path))
+            except Exception as ex:
+                raise LLMClientError(f"load mlx embedding model failed: {model_id}: {ex}") from ex
+            _mlx_embedding_cache[model_id] = loaded
+            return loaded
 
     def models(self) -> list[str]:
         try:

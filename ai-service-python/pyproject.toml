@@ -8,7 +8,9 @@ dependencies = [
   "uvicorn[standard]>=0.30.0",
   "pydantic>=2.8.0",
   "pydantic-settings>=2.5.0",
-  "httpx>=0.27.0"
+  "httpx>=0.27.0",
+  "huggingface-hub>=0.24.0",
+  "mlx-embeddings>=0.1.0"
 ]
 
 [project.optional-dependencies]
@@ -16,6 +18,9 @@ ai = [
   "langgraph>=0.2.0",
   "neo4j>=5.20.0",
   "psycopg[binary]>=3.2.0"
+]
+dev = [
+  "pytest>=8.0.0"
 ]
 
 [tool.uvicorn]

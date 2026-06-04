@@ -30,11 +30,41 @@ public class LocalModelRuntimeService {
     public Map<String, Object> start(String runtime) {
         String normalized = normalizeRuntime(runtime);
         return switch (normalized) {
+            case "mlx" -> startMlx();
             case "ollama" -> startOllama();
             case "llama.cpp" -> startLlamaCpp();
             case "lm-studio" -> runtimeResult(normalized, false, false, "LM Studio 需要手动从桌面应用启动", "http://127.0.0.1:1234/v1");
             default -> runtimeResult(normalized, false, false, "不支持的运行时: " + runtime, "");
         };
+    }
+
+    private Map<String, Object> startMlx() {
+        String host = env("MLX_HOST", "127.0.0.1");
+        String port = env("MLX_PORT", "18090");
+        String baseUrl = env("MLX_API_BASE_URL", "http://" + host + ":" + port + "/v1");
+        if (isAvailable(baseUrl + "/models")) {
+            return runtimeResult("mlx", true, false, "MLX 已在运行", baseUrl);
+        }
+        Path root = findProjectRoot();
+        String python = env("MLX_PYTHON", findMlxPython(root));
+        String model = env("MLX_MODEL", "mlx-community/Qwen3.5-2B-4bit");
+        String maxTokens = env("MLX_MAX_TOKENS", "512");
+        String command = "mkdir -p .runtime/logs .runtime/pids; "
+                + "nohup " + shellQuote(python)
+                + " -m mlx_lm server"
+                + " --model " + shellQuote(model)
+                + " --host " + shellQuote(host)
+                + " --port " + shellQuote(port)
+                + " --max-tokens " + shellQuote(maxTokens)
+                + " --temp 0"
+                + " --chat-template-args '{\"enable_thinking\":false}'"
+                + " --log-level INFO"
+                + " > .runtime/logs/mlx.log 2>&1 & echo $! > .runtime/pids/mlx.pid";
+        execute(root, command);
+        boolean available = waitAvailable(baseUrl + "/models", Duration.ofSeconds(60));
+        return runtimeResult("mlx", available, true,
+                available ? "MLX 启动成功" : "已触发启动命令，但未在 60 秒内就绪",
+                baseUrl);
     }
 
     private Map<String, Object> startOllama() {
@@ -123,7 +153,7 @@ public class LocalModelRuntimeService {
         if ("ollama".equals(normalized)) {
             return ollamaModelKeepAlive(apiBaseUrl, model, "5m", "preload");
         }
-        // llama.cpp / lm-studio: model is loaded at server start, no lazy load needed
+        // MLX / llama.cpp / lm-studio: model is loaded at server start, no lazy load needed
         return runtimeResult(normalized, true, false, normalized + " 模型随服务加载，无需预热", apiBaseUrl);
     }
 
@@ -175,10 +205,38 @@ public class LocalModelRuntimeService {
         return Path.of(".").toAbsolutePath();
     }
 
+    private String findMlxPython(Path root) {
+        Path workspaceVenv = root.resolve("../.venv/bin/python").normalize();
+        if (Files.isExecutable(workspaceVenv)) {
+            return workspaceVenv.toString();
+        }
+        Path projectVenv = root.resolve(".venv/bin/python");
+        if (Files.isExecutable(projectVenv)) {
+            return projectVenv.toString();
+        }
+        Path aiVenv = root.resolve("ai-service-python/.venv/bin/python");
+        if (Files.isExecutable(aiVenv)) {
+            return aiVenv.toString();
+        }
+        return "python3";
+    }
+
+    private String env(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
+    }
+
     private String normalizeRuntime(String runtime) {
         String normalized = runtime == null ? "" : runtime.trim().toLowerCase(Locale.ROOT);
         if (normalized.equals("llama") || normalized.equals("llama-cpp")) {
             return "llama.cpp";
+        }
+        if (normalized.equals("mlx-lm")) {
+            return "mlx";
         }
         return normalized;
     }

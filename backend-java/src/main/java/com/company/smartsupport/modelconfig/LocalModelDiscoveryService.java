@@ -36,6 +36,7 @@ public class LocalModelDiscoveryService {
     public Map<String, Object> discover(String purpose) {
         List<Map<String, Object>> runtimes = new ArrayList<>();
         List<Map<String, Object>> models = new ArrayList<>();
+        discoverOpenAiCompatible("mlx", "MLX", "http://127.0.0.1:18090/v1", purpose, runtimes, models);
         discoverOllama(purpose, runtimes, models);
         discoverOpenAiCompatible("llama.cpp", "Gemma / llama.cpp", "http://127.0.0.1:11435/v1", purpose, runtimes, models);
         discoverOpenAiCompatible("lm-studio", "LM Studio", "http://127.0.0.1:1234/v1", purpose, runtimes, models);
@@ -110,7 +111,7 @@ public class LocalModelDiscoveryService {
                             id,
                             text(model.get("created")),
                             "",
-                            runtime,
+                            "",
                             runtime.equals("llama.cpp") ? "llama" : runtime,
                             purpose));
                 }
@@ -149,8 +150,8 @@ public class LocalModelDiscoveryService {
         result.put("temperature", "knowledge_extract".equals(purpose) ? 0 : 0.2);
         result.put("maxTokens", defaultMaxTokens(purpose, modelName));
         result.put("forceGraphGrounding", true);
-        result.put("embeddingModel", "text-embedding-v4");
-        result.put("embeddingDim", 1536);
+        result.put("embeddingModel", "mlx-community/bge-m3-mlx-4bit");
+        result.put("embeddingDim", 1024);
         result.put("recommended", recommended(modelName));
         result.put("fitNote", fitNote(modelName));
         return result;
@@ -220,6 +221,9 @@ public class LocalModelDiscoveryService {
         }
         if (lower.contains("qwen2.5:3b")) {
             return "能力略强但延迟更高，建议先验证后启用";
+        }
+        if (lower.contains("qwen3.5") && lower.contains("4bit")) {
+            return "Apple Silicon 上速度优先，适合本地知识抽取和结构化 JSON 输出";
         }
         if (lower.contains("gemma")) {
             return "可用于实验，长 RAG prompt 可能较慢";

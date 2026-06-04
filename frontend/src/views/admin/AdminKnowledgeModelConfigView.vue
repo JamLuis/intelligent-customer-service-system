@@ -109,16 +109,16 @@ function defaultForm(purpose: Purpose, providerMode: ProviderMode): ProfileForm 
     providerMode,
     profileKey: isLocal ? 'default-local' : 'default-cloud',
     displayName: `${isChat ? '对话问答' : '知识抽取'} - ${isLocal ? '本地模型' : '云端模型'}`,
-    provider: isLocal ? 'local-openai-compatible' : 'bailian',
-    apiBaseUrl: isLocal ? 'http://127.0.0.1:11434/v1' : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKeyConfigured: isLocal,
-    apiKeyMasked: isLocal ? '********' : '',
-    apiKeyInput: isLocal ? 'ollama' : '',
+    provider: isLocal ? 'mlx-openai-compatible' : 'bailian',
+    apiBaseUrl: isLocal ? 'http://127.0.0.1:18090/v1' : 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeyConfigured: false,
+    apiKeyMasked: '',
+    apiKeyInput: '',
     workspaceId: '',
-    model: isLocal ? 'qwen2.5:1.5b' : 'qwen3.6-flash',
-    embeddingModel: isLocal ? 'nomic-embed-text' : 'text-embedding-v4',
-    embeddingDim: isLocal ? 768 : 1536,
-    localRuntime: isLocal ? 'ollama' : '',
+    model: isLocal ? 'mlx-community/Qwen3.5-2B-4bit' : 'qwen3.6-flash',
+    embeddingModel: isLocal ? 'mlx-community/bge-m3-mlx-4bit' : 'text-embedding-v4',
+    embeddingDim: isLocal ? 1024 : 1536,
+    localRuntime: isLocal ? 'mlx' : '',
     modelFilePath: '',
     contextWindow: 8192,
     temperature: isChat ? 0.2 : 0,
@@ -222,8 +222,8 @@ async function applyLocalModel(model: LocalModelOption) {
   form.apiBaseUrl = model.apiBaseUrl;
   form.apiKeyInput = model.apiKey || 'ollama';
   form.model = model.model;
-  form.embeddingModel = model.embeddingModel || 'text-embedding-v4';
-  form.embeddingDim = Number(model.embeddingDim || 1536);
+  form.embeddingModel = model.embeddingModel || 'mlx-community/bge-m3-mlx-4bit';
+  form.embeddingDim = Number(model.embeddingDim || 1024);
   form.localRuntime = model.localRuntime || model.runtime;
   form.modelFilePath = '';
   form.contextWindow = Number(model.contextWindow || 8192);
@@ -268,7 +268,7 @@ async function autoCheckCurrentModel() {
 }
 
 function canStartRuntime(runtime: string) {
-  return runtime === 'ollama' || runtime === 'llama.cpp';
+  return runtime === 'mlx' || runtime === 'ollama' || runtime === 'llama.cpp';
 }
 
 async function startRuntime(runtime: string) {
@@ -463,7 +463,7 @@ onMounted(async () => {
             <div class="picker-header">
               <div>
                 <div class="picker-title">本机模型</div>
-                <div class="picker-subtitle">自动识别 Ollama、llama.cpp、LM Studio；你可以自由选择任意模型，切换时会自动检查状态。</div>
+                <div class="picker-subtitle">自动识别 MLX、Ollama、llama.cpp、LM Studio；你可以自由选择任意模型，切换时会自动检查状态。</div>
               </div>
               <div class="toolbar">
                 <el-button :icon="RefreshCw" :loading="scanning" @click="scanLocalModels">重新扫描</el-button>
@@ -515,7 +515,7 @@ onMounted(async () => {
                 <el-input v-model="currentForm.model" />
               </el-form-item>
               <el-form-item label="API Key">
-                <el-input v-model="currentForm.apiKeyInput" show-password :placeholder="currentForm.apiKeyConfigured ? `已配置：${currentForm.apiKeyMasked}` : '本地可填 ollama，云端填写 API Key'" />
+                <el-input v-model="currentForm.apiKeyInput" show-password :placeholder="currentForm.apiKeyConfigured ? `已配置：${currentForm.apiKeyMasked}` : '本地通常留空，云端填写 API Key'" />
               </el-form-item>
               <el-form-item label="Workspace ID">
                 <el-input v-model="currentForm.workspaceId" placeholder="可选" />
@@ -536,7 +536,7 @@ onMounted(async () => {
                 <el-input-number v-model="currentForm.maxTokens" :min="128" :max="8192" :step="128" />
               </el-form-item>
               <el-form-item v-if="activeMode === 'local'" label="本地运行时">
-                <el-input v-model="currentForm.localRuntime" placeholder="ollama / llama.cpp / lm-studio" />
+                <el-input v-model="currentForm.localRuntime" placeholder="mlx / ollama / llama.cpp / lm-studio" />
               </el-form-item>
               <el-form-item v-if="activeMode === 'local'" label="本地模型文件">
                 <el-input v-model="currentForm.modelFilePath" />

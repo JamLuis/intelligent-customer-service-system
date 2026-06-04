@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS knowledge_block (
   normalized_text text,
   content_hash varchar(128) NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  embedding vector(1536),
+  embedding vector(1024),
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ck_knowledge_block_type CHECK (block_type IN ('title','paragraph','table','table_row','image_ocr','code','log','json','csv','kv','sheet')),
   CONSTRAINT ck_knowledge_block_page CHECK (page_no IS NULL OR page_no > 0),
@@ -121,7 +121,17 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_block_metadata_gin ON knowledge_block U
 CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_hnsw ON knowledge_block USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
 COMMENT ON TABLE knowledge_block IS '知识解析块表：保存文本块、表格块、OCR 块、日志块及向量索引';
-COMMENT ON COLUMN knowledge_block.embedding IS 'pgvector 语义召回向量，当前维度 1536；只作为证据召回，不作为最终关系判断';
+COMMENT ON COLUMN knowledge_block.embedding IS 'pgvector 语义召回向量，当前维度 1024（BGE-M3 MLX）；只作为证据召回，不作为最终关系判断';
+
+DROP INDEX IF EXISTS idx_knowledge_block_embedding_hnsw;
+ALTER TABLE knowledge_block
+  ALTER COLUMN embedding TYPE vector(1024)
+  USING CASE
+    WHEN embedding IS NULL THEN NULL
+    WHEN vector_dims(embedding) = 1024 THEN embedding::vector(1024)
+    ELSE NULL
+  END;
+CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_hnsw ON knowledge_block USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
 -- ============================================================================
 -- V0.3.1 知识块加固：父链 + embedding 版本三件套 + 全文检索 tsvector
@@ -147,7 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_block_embedding_model_ver
 COMMENT ON COLUMN knowledge_block.parent_block_id IS 'V0.3.1：父块引用，用于表格→单元格、章节→段落等层级关系';
 COMMENT ON COLUMN knowledge_block.embedding_model IS 'V0.3.1：embedding 模型名（如 bge-large-zh-v1.5），Hybrid Retrieval 严格按此过滤';
 COMMENT ON COLUMN knowledge_block.embedding_version IS 'V0.3.1：embedding 版本（如 2024Q4），与 model 联合唯一标识向量空间';
-COMMENT ON COLUMN knowledge_block.embedding_dim IS 'V0.3.1：embedding 维度（如 1536），用于自适应索引校验';
+COMMENT ON COLUMN knowledge_block.embedding_dim IS 'V0.3.1：embedding 维度（如 1024），用于自适应索引校验';
 COMMENT ON COLUMN knowledge_block.ts IS 'V0.3.1：生成列 tsvector(simple)，用于 BM25 全文召回（plainto_tsquery）';
 
 CREATE TABLE IF NOT EXISTS graph_candidate_entity (

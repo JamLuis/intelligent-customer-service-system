@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     llm_workspace_id: str = Field(default="", alias="LLM_WORKSPACE_ID")
     llm_model: str = Field(default="qwen3.6-flash", alias="LLM_MODEL")
 
-    embedding_model: str = Field(default="text-embedding-v4", alias="EMBEDDING_MODEL")
-    embedding_dim: int = Field(default=1536, alias="EMBEDDING_DIM")
+    embedding_model: str = Field(default="mlx-community/bge-m3-mlx-4bit", alias="EMBEDDING_MODEL")
+    embedding_dim: int = Field(default=1024, alias="EMBEDDING_DIM")
     embedding_version: str = Field(default="v1", alias="EMBEDDING_VERSION")
 
     http_timeout_s: float = Field(default=30.0, alias="AI_HTTP_TIMEOUT_S")
