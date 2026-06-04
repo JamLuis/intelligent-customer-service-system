@@ -4,7 +4,14 @@ import GlowButton from '../../components/GlowButton'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 
 export default function WorkOrderPanel() {
-  const { activeCase, ui } = useDiagnosisStore()
+  const { activeCase, activeQuestion, activeStageIndex, hasActiveConversation, isPlaybackRunning, ui } = useDiagnosisStore()
+  const titleText = hasActiveConversation ? activeCase.title : '待发送后生成'
+  const questionText = hasActiveConversation ? activeQuestion : '待发送后生成'
+  const typeText = !hasActiveConversation || activeStageIndex === 0 ? '正在识别工单类型' : activeCase.workOrderType
+  const ownerText = !hasActiveConversation || activeStageIndex === 0 ? '责任人生成中' : activeCase.owner
+  const attachmentText = !hasActiveConversation || activeStageIndex === 0 ? `正在汇总 ${activeCase.evidence.slice(0, 2).map((item) => item.label).join(' / ')} 相关材料` : activeCase.attachmentsSummary
+  const priorityText = !hasActiveConversation || activeStageIndex === 0 ? '--' : activeCase.priority
+  const severityText = !hasActiveConversation || activeStageIndex === 0 ? '待分级' : activeCase.severityLabel
 
   return (
     <GlassCard className="workorder-panel">
@@ -18,39 +25,41 @@ export default function WorkOrderPanel() {
       <div className="workorder-fields">
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.titleLabel}</span>
-          <strong>{activeCase.title}</strong>
+          <strong>{titleText}</strong>
         </div>
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.descriptionLabel}</span>
-          <strong>{activeCase.question}</strong>
+          <strong>{questionText}</strong>
         </div>
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.typeLabel}</span>
-          <strong>{activeCase.workOrderType}</strong>
+          <strong>{typeText}</strong>
         </div>
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.priorityLabel}</span>
           <strong>
-            {activeCase.priority}
-            <em>{activeCase.severityLabel}</em>
+            {priorityText}
+            <em>{severityText}</em>
           </strong>
         </div>
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.ownerLabel}</span>
           <strong>
             <UserCog size={14} />
-            {activeCase.owner}
+            {ownerText}
           </strong>
         </div>
         <div className="workorder-field glass-card">
           <span>{ui.workOrder.attachmentsLabel}</span>
-          <strong>{activeCase.attachmentsSummary}</strong>
+          <strong>{attachmentText}</strong>
         </div>
       </div>
 
       <div className="workorder-actions">
-        <GlowButton icon={<FilePlus2 size={16} />}>{ui.workOrder.generateLabel}</GlowButton>
-        <GlowButton icon={<Download size={16} />} kind="secondary">
+        <GlowButton disabled={!hasActiveConversation || activeStageIndex < 2 || isPlaybackRunning} icon={<FilePlus2 size={16} />}>
+          {activeStageIndex < 2 ? '生成中...' : ui.workOrder.generateLabel}
+        </GlowButton>
+        <GlowButton disabled={!hasActiveConversation || activeStageIndex < 2 || isPlaybackRunning} icon={<Download size={16} />} kind="secondary">
           {ui.workOrder.exportLabel}
         </GlowButton>
       </div>

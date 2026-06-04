@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "title": "业务智能诊断平台产品能力展示",
+    "subject": "LightGraph 二开智能客服与业务诊断系统能力展示",
+    "author": "CompanyProject",
+    "company": "CompanyProject",
+    "language": "zh-CN",
+    "outputFile": "/Users/lucas/Work/CompanyProject/intelligent-customer-service-system/建设方案/PPT产出/业务智能诊断平台_产品能力展示.pptx",
+    "footer": "业务智能诊断平台 / 能力展示"
+  },
+  "theme": {
+    "variant": "executive",
+    "font": "PingFang SC",
+    "titleFont": "PingFang SC",
+    "colors": {
+      "navy": "081A33",
+      "darkBlue": "0D2B4F",
+      "blue": "2563EB",
+      "teal": "14B8A6",
+      "cream": "F7FAFC",
+      "warm": "F59E0B",
+      "mint": "DCFCE7",
+      "paleBlue": "EAF2FF",
+      "paleGold": "FEF3C7"
+    },
+    "tones": {
+      "navy": { "fill": "081A33", "accent": "2563EB", "titleColor": "FFFFFF", "bodyColor": "DCEBFF", "dark": true },
+      "darkBlue": { "fill": "0D2B4F", "accent": "14B8A6", "titleColor": "FFFFFF", "bodyColor": "E8F7FF", "dark": true },
+      "blue": { "fill": "EAF2FF", "accent": "2563EB", "titleColor": "0F172A", "bodyColor": "475569", "dark": false },
+      "teal": { "fill": "E6FFFA", "accent": "14B8A6", "titleColor": "0F172A", "bodyColor": "475569", "dark": false },
+      "gold": { "fill": "FEF3C7", "accent": "F59E0B", "titleColor": "0F172A", "bodyColor": "475569", "dark": false }
+    }
+  },
+  "deck": {
+    "scenario": "product-showcase",
+    "title": "业务智能诊断平台",
+    "subtitle": "面向船舶告警与巡查卫士的智能业务协同中台",
+    "pages": [
+      {
+        "type": "cover",
+        "label": "BUSINESS DIAGNOSIS PLATFORM",
+        "title": "业务智能诊断平台",
+        "subtitle": "懂业务、能诊断、可追溯、能闭环",
+        "summary": "围绕船舶告警、巡查卫士、设备状态、接口调用、数据库结构和工单流转，构建一个可连接真实系统的智能协同与诊断中台。",
+        "badge": "LightGraph + MCP + 知识图谱",
+        "metaNote": "面向：客服 / 运维 / 实施 / 研发 / 管理 / 审计\n目标：让复杂业务问题在同一条证据链上闭环",
+        "sideCards": [
+          { "title": "不是问答框", "body": "系统理解页面、接口、数据、设备、权限和工单，不只是匹配知识库文本。", "tone": "white" },
+          { "title": "连接真实系统", "body": "通过受控 MCP 查询真实数据，按权限、脱敏和审计边界执行。", "tone": "blue" },
+          { "title": "形成诊断链路", "body": "从用户问题到证据链、根因、责任人、工单草案，形成可追溯结果。", "tone": "teal" },
+          { "title": "持续沉淀资产", "body": "每次排障沉淀为历史案例与业务图谱，越用越懂业务。", "tone": "gold" }
+        ]
+      },
+      {
+        "type": "question-grid",
+        "label": "核心定位",
+        "title": "购买的不是聊天能力，而是业务诊断能力",
+        "cards": [
+          { "title": "1. 能回答是什么", "body": "把船舶、告警、设备、巡查、页面入口和数据库字段组织成业务语义，降低系统学习成本。", "tone": "white" },
+          { "title": "2. 能解释为什么", "body": "从定位、权限、消息、视频、接口、状态口径等链路给出原因，而不是只返回页面说明。", "tone": "blue" },
+          { "title": "3. 能指出查哪里", "body": "把自然语言问题转成接口、表、日志、配置和页面入口的可执行排查路径。", "tone": "teal" },
+          { "title": "4. 能推动怎么处理", "body": "输出阶段性结论、处理建议、责任人和工单草案，让问题从咨询走向闭环。", "tone": "gold" }
+        ]
+      },
+      {
+        "type": "image-showcase",
+        "label": "产品界面",
+        "title": "一个问题驱动整条诊断链路运行",
+        "subtitle": "用户点击案例后发送问题，系统像 agent 一样逐步展开对话、证据链、结论和工单结果。",
+        "imagePath": "/Users/lucas/Work/CompanyProject/intelligent-customer-service-system/建设方案/407c44237a2e49ae9d320fc5705b7d1a.png",
+        "caption": "UE 截图：AI 会话、诊断证据链、诊断结论和工单信息在同一工作台联动。",
+        "dark": true,
+        "tone": "teal",
+        "callouts": [
+          { "title": "会话驱动", "body": "输入问题后启动诊断流程，逐步显示思考过程与阶段结论。", "tone": "blue" },
+          { "title": "证据链可视化", "body": "船舶、设备、定位数据、服务状态按路径串联，减少口头扯皮。", "tone": "teal" },
+          { "title": "结论结构化", "body": "根因、影响范围、处理建议、优先级统一落到可解释结果。", "tone": "gold" },
+          { "title": "工单闭环", "body": "自动生成工单草案，连接责任人、附件、优先级和处理建议。", "tone": "white" }
+        ]
+      },
+      {
+        "type": "role-summary",
+        "label": "角色能力",
+        "title": "同一套平台服务 7 类关键角色",
+        "headline": "从一线答复到管理决策，都围绕同一条证据链协同",
+        "headlineNote": "平台不是替代业务系统，而是把分散系统能力组织成可查询、可诊断、可闭环的智能工作台。",
+        "cards": [
+          { "title": "客服坐席副驾", "body": "把模糊问题转成排查路径\n生成标准答复与工单草案", "tone": "white" },
+          { "title": "业务查询助手", "body": "自然语言查询告警、巡查、设备\n输出结果和证据来源", "tone": "blue" },
+          { "title": "运维诊断助手", "body": "串联接口、Redis、MQTT、设备\n快速定位平台级故障", "tone": "teal" },
+          { "title": "实施交付顾问", "body": "沉淀上线体检清单\n指导船舶、围栏、视频、设备配置", "tone": "gold" }
+        ],
+        "metrics": [
+          { "label": "研发排障", "value": "调用链", "note": "接口、字段、页面、表、日志与影响面定位", "tone": "white" },
+          { "label": "运营分析", "value": "趋势洞察", "note": "告警闭环率、误报率、巡查质量、设备健康", "tone": "white" },
+          { "label": "审计权限", "value": "可控可追溯", "note": "权限继承、脱敏、调用留痕、高风险确认", "tone": "white" },
+          { "label": "共同价值", "value": "少等待", "note": "同一证据链减少跨团队反复沟通", "tone": "navy" }
+        ]
+      },
+      {
+        "type": "four-blocks",
+        "label": "高价值场景",
+        "title": "优先打通 5 个最能证明价值的业务场景",
+        "blocks": [
+          { "title": "船舶告警查询与状态解释", "tone": "white", "bullets": ["检查 token、时间窗、租户权限、告警状态和处理口径", "解释为什么接口查不到、页面显示不一致、告警状态不同", "让客服能直接给出带证据的专业答复"] },
+          { "title": "地图船舶不显示诊断", "tone": "blue", "bullets": ["检查船舶资料、定位上报、设备绑定、账号权限和地图筛选", "区分页面问题、设备问题、权限问题和数据绑定问题", "适合监管现场和大屏保障场景"] },
+          { "title": "驾驶舱抓图失败排查", "tone": "teal", "bullets": ["检查 token、openId、shipName、第三方配置和船舶权限", "继续核验 GB 通道、驾驶舱媒体配置和抓图服务返回", "把研发问题前置结构化，减少来回沟通"] },
+          { "title": "提醒与巡查证据查询", "tone": "gold", "bullets": ["账号/设备质保提醒：查任务、Redis、notice、MQTT topic", "巡查漏检：查计划、点位、围栏、打卡位置和证明材料", "让争议问题变成证据问题"] }
+        ]
+      },
+      {
+        "type": "before-after",
+        "label": "现场保障",
+        "title": "复杂问题从多人拉群，变成系统化并行排查",
+        "leftTitle": "传统处理方式",
+        "leftBullets": ["客服只能转述客户问题", "前端、后端、运维、实施各查一段", "客户等待时间长，责任边界不清", "阶段性结论难以对外说明"],
+        "leftNote": "高压场景下，最怕的是没人能快速回答：到底是平台、设备、权限还是配置问题。",
+        "rightTitle": "平台处理方式",
+        "rightCards": [
+          { "title": "定级", "body": "识别重点船舶、重点区域、领导现场保障等高优先级事件" },
+          { "title": "并行", "body": "同时核查定位、告警、视频、权限、消息和页面入口" },
+          { "title": "闭环", "body": "输出阶段结论、责任人、处理建议和工单草案" }
+        ],
+        "highlight": "关键价值：几分钟内给出可说、可查、可派单的阶段性结论。"
+      },
+      {
+        "type": "flow-and-sidebars",
+        "label": "技术路径",
+        "title": "能力建设顺序：场景定边界，图谱和 MCP 提供支撑",
+        "flowSteps": [
+          { "title": "选择高价值\n试点场景", "tone": "blue" },
+          { "title": "梳理数据源\n接口与权限", "tone": "teal" },
+          { "title": "构建最小\n业务知识图谱", "tone": "blue" },
+          { "title": "封装受控\nMCP 工具", "tone": "teal" },
+          { "title": "LightGraph\n诊断编排", "tone": "blue" }
+        ],
+        "highlight": "不是把全部接口裸给 AI，而是用场景牵引最小图谱、受控工具和可审计编排。",
+        "sideBlocks": [
+          { "title": "知识图谱解决什么", "tone": "white", "bullets": ["对象关系：船舶、租户、设备、告警、巡查、页面、接口、表", "状态口径：确警、处理、误报、超时、权限过滤", "路径定位：哪个页面展示、哪个接口查询、哪个字段决定结果"] },
+          { "title": "MCP 工具治理", "tone": "blue", "bullets": ["只封装业务能力，不裸露 Controller", "默认只读、按租户和设备权限过滤", "参数摘要、结果摘要、脱敏命中和调用留痕"] }
+        ]
+      },
+      {
+        "type": "comparison-metrics",
+        "label": "价值对比",
+        "title": "从被动售后，升级为主动诊断与运营优化",
+        "leftTitle": "没有平台时",
+        "leftBullets": ["一线依赖经验和人工转述", "问题经常跨页面、接口、设备和消息链路", "研发收到的信息不完整，排障成本高", "案例处理完就散落在聊天记录里"],
+        "rightTitle": "接入平台后",
+        "rightBullets": ["自然语言直接触发业务诊断流程", "证据链连接真实数据、图谱关系和工具调用", "工单草案自动带上根因、证据、优先级和责任人", "每次处理沉淀为历史案例和图谱资产"],
+        "metrics": [
+          { "label": "响应方式", "value": "从问答到诊断", "note": "不只回答按钮在哪里，而是解释问题为什么发生", "tone": "navy" },
+          { "label": "协同效率", "value": "少拉群", "note": "同一证据链减少跨团队来回确认", "tone": "white" },
+          { "label": "长期价值", "value": "越用越懂", "note": "历史案例和图谱持续沉淀业务知识", "tone": "white" }
+        ],
+        "highlight": "核心购买理由：降低沟通成本、缩短故障定位时间、提升售后响应质量、形成可复制交付能力。"
+      },
+      {
+        "type": "capability-summary",
+        "label": "安全边界",
+        "title": "可接入真实系统，也必须可控、可审计、可追责",
+        "leftTitle": "AI 能力边界清晰，客户才敢让它连接生产系统",
+        "leftBodyLines": ["权限继承：租户、角色、船舶、设备范围", "默认只读：查询、解释、诊断、工单草拟", "字段脱敏：token、手机号、密钥、内部 URL", "调用留痕：用户、时间、工具、参数摘要、结果摘要", "高风险确认：重启设备、批量处理、修改配置需审批"],
+        "leftHighlight": "安全不是附加项，而是政企客户购买智能平台的前提。",
+        "rightCards": [
+          { "title": "客户最关心的问题", "body": "AI 会不会查到其他机构数据？会不会直接执行危险操作？出了问题能不能追责？平台必须把这些问题变成可验证机制。", "tone": "blue" },
+          { "title": "平台给出的答案", "body": "所有工具调用都继承当前用户权限，跨租户数据默认拒绝或裁剪，敏感字段脱敏，高风险动作不自动执行，审计记录可回放。", "tone": "gold" }
+        ],
+        "bottomBar": "能连接真实业务系统，又能守住边界，是平台从演示走向落地的关键。"
+      },
+      {
+        "type": "closing",
+        "title": "业务智能诊断平台",
+        "subtitle": "最终产品主张",
+        "cards": [
+          { "title": "一句话价值", "body": "让客户用自然语言理解复杂业务系统，让客服、运维、实施、研发围绕同一条证据链协同，让每一次问题处理都沉淀为知识资产。", "tone": "darkBlue" },
+          { "title": "最适合先落地的路径", "body": "用 5 个高价值场景牵引建设：告警查询、地图不显示、抓图失败、提醒未推送、巡查漏检。跑通后，新增场景复用图谱、MCP 和 LightGraph 编排体系。", "tone": "darkBlue" }
+        ],
+        "footerNote": "业务智能诊断平台 / 产品能力展示"
+      }
+    ]
+  }
+}

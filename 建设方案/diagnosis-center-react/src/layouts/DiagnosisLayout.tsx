@@ -29,8 +29,8 @@ function getViewportScale() {
     return 1
   }
 
-  const availableWidth = window.innerWidth - 24
-  const availableHeight = window.innerHeight - 24
+  const availableWidth = window.innerWidth - 8
+  const availableHeight = window.innerHeight - 8
 
   return Math.min(availableWidth / DESIGN_WIDTH, availableHeight / DESIGN_HEIGHT, 1)
 }

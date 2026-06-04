@@ -5,7 +5,11 @@ import MetricCard from '../../components/MetricCard'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 
 export default function CaseSidebar() {
-  const { activeCaseId, cases, selectCase, ui } = useDiagnosisStore()
+  const { activeCaseId, activeRoleId, filteredCases, roles, selectCase, selectRole, ui } = useDiagnosisStore()
+
+  const totalCount = filteredCases.length
+  const processingCount = filteredCases.filter((item) => item.statusTone === 'warning' || item.statusTone === 'danger' || item.status.includes('剧本')).length
+  const completedCount = filteredCases.filter((item) => item.statusTone === 'success' || item.status.includes('已')).length
 
   return (
     <div className="case-sidebar">
@@ -17,10 +21,26 @@ export default function CaseSidebar() {
         </button>
       </GlassCard>
 
+      <GlassCard className="case-role-switcher">
+        <span className="section-kicker">{ui.caseSidebar.roleSectionLabel}</span>
+        <div className="case-role-switcher__tabs">
+          {roles.map((role) => (
+            <button
+              className={`case-role-switcher__tab${role.id === activeRoleId ? ' is-active' : ''}`}
+              key={role.id}
+              onClick={() => selectRole(role.id)}
+              type="button"
+            >
+              {role.label}
+            </button>
+          ))}
+        </div>
+      </GlassCard>
+
       <div className="case-sidebar__metrics">
-        {ui.caseSidebar.metrics.map((item) => (
-          <MetricCard key={item.id} label={item.label} value={item.value} tone={item.tone} />
-        ))}
+        <MetricCard label={ui.caseSidebar.metrics[0].label} value={`${totalCount}`} tone={ui.caseSidebar.metrics[0].tone} />
+        <MetricCard label={ui.caseSidebar.metrics[1].label} value={`${processingCount}`} tone={ui.caseSidebar.metrics[1].tone} />
+        <MetricCard label={ui.caseSidebar.metrics[2].label} value={`${completedCount}`} tone={ui.caseSidebar.metrics[2].tone} />
       </div>
 
       <div className="case-sidebar__search-row">
@@ -34,7 +54,7 @@ export default function CaseSidebar() {
       </div>
 
       <div className="case-list">
-        {cases.map((item) => {
+        {filteredCases.map((item) => {
           const active = item.id === activeCaseId
 
           return (
@@ -47,6 +67,10 @@ export default function CaseSidebar() {
               <div className="case-item__top">
                 <strong>{item.title}</strong>
                 <StatusTag tone={item.priority === 'P1' || item.priority === 'P2' ? 'warning' : 'info'}>{item.priority}</StatusTag>
+              </div>
+              <div className="case-item__tags">
+                <span className="case-tag">{item.roleLabel}</span>
+                <span className="case-tag case-tag--scene">{item.sceneType}</span>
               </div>
               <div className="case-item__meta">
                 <span>
@@ -65,7 +89,9 @@ export default function CaseSidebar() {
                   <Paperclip size={14} />
                 </span>
               </div>
-              <small>{item.tenant}</small>
+              <small>
+                {item.tenant} · {item.sceneLabel}
+              </small>
             </button>
           )
         })}

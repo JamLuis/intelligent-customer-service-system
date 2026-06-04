@@ -3,7 +3,25 @@ import GlassCard from '../../components/GlassCard'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 
 export default function ConclusionPanel() {
-  const { activeCase, ui } = useDiagnosisStore()
+  const { activeCase, activeStageIndex, hasActiveConversation, isPlaybackRunning, playbackPhase, ui } = useDiagnosisStore()
+  const rootCauseText =
+    !hasActiveConversation
+      ? '发送后开始生成根因分析。'
+      : playbackPhase < 2
+        ? `系统已接收“${activeCase.title}”，正在归集根因线索与责任链路。`
+        : activeCase.rootCause
+  const impactItems = !hasActiveConversation ? ['等待发送后生成影响范围。'] : activeStageIndex === 0 ? ['正在汇总影响范围...'] : activeCase.impact
+  const suggestionItems =
+    !hasActiveConversation
+      ? ['等待发送后逐步生成处置建议。']
+      : activeStageIndex === 0
+      ? ['等待诊断推进后生成处置建议。']
+      : activeStageIndex === 1
+        ? [activeCase.suggestions[0], '其余建议与工单字段正在生成中。']
+        : activeCase.suggestions
+  const ownerText = !hasActiveConversation || activeStageIndex === 0 ? 'AI 自动分诊' : activeCase.owner
+  const priorityText = !hasActiveConversation || activeStageIndex === 0 ? '--' : activeCase.priority
+  const responseDeadlineText = !hasActiveConversation || activeStageIndex === 0 ? '等待结论输出' : activeCase.responseDeadline
 
   return (
     <GlassCard className="conclusion-panel">
@@ -17,7 +35,7 @@ export default function ConclusionPanel() {
             <ShieldAlert size={16} />
             <span>{ui.conclusion.rootCauseLabel}</span>
           </div>
-          <strong>{activeCase.rootCause}</strong>
+          <strong>{rootCauseText}</strong>
           <div className="confidence-strip">
             <span>
               {ui.conclusion.confidenceLabel}
@@ -35,7 +53,7 @@ export default function ConclusionPanel() {
             <span>{ui.conclusion.impactLabel}</span>
           </div>
           <ul>
-            {activeCase.impact.map((item) => (
+            {impactItems.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -51,7 +69,7 @@ export default function ConclusionPanel() {
             <span>{ui.conclusion.suggestionLabel}</span>
           </div>
           <ol>
-            {activeCase.suggestions.map((item) => (
+            {suggestionItems.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ol>
@@ -62,8 +80,8 @@ export default function ConclusionPanel() {
             <CircleCheckBig size={16} />
             <span>{ui.conclusion.ownerLabel}</span>
           </div>
-          <strong>{activeCase.owner}</strong>
-          <button className="inline-action" type="button">
+          <strong>{ownerText}</strong>
+          <button className="inline-action" disabled={!hasActiveConversation || activeStageIndex < 2 || isPlaybackRunning} type="button">
             {ui.conclusion.reassignLabel}
           </button>
         </div>
@@ -73,10 +91,10 @@ export default function ConclusionPanel() {
             <AlertTriangle size={16} />
             <span>{ui.conclusion.priorityLabel}</span>
           </div>
-          <strong className="priority-value">{activeCase.priority}</strong>
+          <strong className="priority-value">{priorityText}</strong>
           <p className="conclusion-note">
             {ui.conclusion.responseDeadlineLabel}
-            {activeCase.responseDeadline}
+            {responseDeadlineText}
           </p>
         </div>
       </div>
